@@ -1,46 +1,53 @@
 # UT2004-AIO-Installer .gitignore
 
 # ==============================================================================
-# Personal Automation Scripts (won't be committed)
+# CONVENTION: Underscore prefix = temporary/local (DON'T commit)
+#             No underscore = part of project (DO commit)
 # ==============================================================================
-# Use underscore prefix for your personal scripts: _upload.bat, _commit.bat, etc.
+
+# ==============================================================================
+# Personal Automation Scripts (local only)
+# ==============================================================================
 _*.bat
 _*.cmd
-
-# Or use "local_" prefix: local_build.bat, local_test.bat, etc.
 local_*.bat
 local_*.cmd
 
 # ==============================================================================
-# Compiled Executables
+# Runtime Folders (generated at runtime, don't commit)
+# ==============================================================================
+_Downloads/
+_Temp/
+_Temp_CABs/
+_ISO/
+ISO_Extracted/
+UT2004_Temp/
+
+# ==============================================================================
+# Downloaded Files (cache, don't commit)
+# ==============================================================================
+*.iso
+
+# ==============================================================================
+# Installation Testing (local only)
+# ==============================================================================
+UT2004_Test/
+test_installs/
+
+# ==============================================================================
+# Compiled Executables (generated from .au3 source)
 # ==============================================================================
 *.exe
 *.a3x
 
 # ==============================================================================
-# AutoIt Compiled Files
+# Bulk Downloads from Claude
 # ==============================================================================
-*.aut
-
-# ==============================================================================
-# Temporary Files
-# ==============================================================================
-*.tmp
-*.temp
-*.log
-~*
-
-# ==============================================================================
-# Download Cache (we don't want to commit downloaded installers/bonus packs)
-# ==============================================================================
-downloads/
-temp/
-cache/
-
-# Bulk download from Claude sidebar
 files.zip
 
-# Claude's internal folder structure (not part of project)
+# ==============================================================================
+# Claude's Internal Folders
+# ==============================================================================
 mnt/
 
 # ==============================================================================
@@ -60,24 +67,29 @@ $RECYCLE.BIN/
 *.code-workspace
 
 # ==============================================================================
-# Testing/Development
+# Logs and Temp Files
 # ==============================================================================
-test_installs/
-scratch/
-notes.txt
-todo.txt
+*.log
+*.tmp
+*.temp
+~*
 
 # ==============================================================================
-# Keep These Files
+# KEEP THESE FILES (part of project - NO underscore prefix)
 # ==============================================================================
-# We want to keep the AutoIt source files (.au3)
+# Tools folder (bundled with installer)
+!Tools/
+!Tools/*.exe
+!Tools/*.dll
+
+# License files
+!Licenses/
+!Licenses/*.txt
+
+# Source files
 !*.au3
-
-# We want to keep documentation
 !*.md
+
+# Documentation
 !docs/
 
-# We want to keep any icons or images
-!*.ico
-!*.png
-!*.jpg

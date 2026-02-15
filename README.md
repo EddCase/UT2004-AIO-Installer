@@ -1,8 +1,8 @@
 # UT2004 All-In-One Installer
 
-A modern, user-friendly installer for Unreal Tournament 2004 with support for official and community bonus packs.
+A modern, self-contained installer for Unreal Tournament 2004 with full control over the installation process.
 
-![Version](https://img.shields.io/badge/version-0.1.1--alpha-orange)
+![Version](https://img.shields.io/badge/version-0.3.0--alpha-orange)
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
 ![AutoIt](https://img.shields.io/badge/AutoIt-v3.3.14+-blue)
 
@@ -10,55 +10,72 @@ A modern, user-friendly installer for Unreal Tournament 2004 with support for of
 
 ## 🎮 What is This?
 
-This is an **All-In-One installer** for Unreal Tournament 2004 that makes it easy to install:
-
-- ✅ Base game with latest OldUnreal community patch
-- 🔜 Mega Pack (9 additional official maps)
-- 🔜 Community Bonus Pack 1 (19-21 community maps)
-- 🔜 Community Bonus Pack 2 Vol 1 & 2 (41 community maps)
-
-Built with AutoIt and featuring a dark UT2004-themed interface.
+A completely custom installer for Unreal Tournament 2004 that:
+- Downloads and extracts the game ISO ourselves
+- Applies the latest OldUnreal community patch
+- Requires **NO CD KEY** (patch removes validation)
+- Features a dark UT2004-themed interface
+- Self-contained (all tools bundled)
 
 ---
 
-## 🚀 Current Status: v0.1.1-alpha
+## 🚀 Current Status: v0.3.0-alpha
 
-**What Works:**
-- Dark themed GUI with UT2004-inspired colors
-- Installation path selector
-- Automatic download of OldUnreal installer
-- Download progress tracking
-- Silent installation of base game
-- Latest community patch applied automatically
+**Complete rewrite with custom installation process.**
 
-**In Development:**
-- Mega Pack support
-- Community Bonus Packs
-- Installation presets
-- Hash verification
+### What Works:
+- Nothing yet - fresh start! 🎉
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and roadmap.
+### In Development:
+- Phase 1: GUI with UT2004 theme
+- Phase 2: ISO download with progress
+- Phase 3: ISO extraction (7-Zip)
+- Phase 4: CAB extraction (unshield)
+- Phase 5: Patch application and finalization
 
 ---
 
 ## 📋 Requirements
 
 - **OS**: Windows 7 or later
-- **Disk Space**: ~10-12 GB (with all bonus packs)
-- **Internet**: Required for downloading game files
+- **Disk Space**: ~20 GB temporary, ~15 GB final
+- **Internet**: Required for downloading game files (~2.76 GB ISO + patches)
 - **AutoIt**: v3.3.14+ (for compiling from source)
 
 ---
 
 ## 🔧 How to Use
 
-### Option 1: Download Release (Coming Soon)
+### Download Release (Coming Soon)
 Download the compiled `.exe` from [Releases](../../releases) and run it.
 
-### Option 2: Run from Source
+### Run from Source
 1. Install [AutoIt](https://www.autoitscript.com/)
-2. Download `UT2004_Installer_vX.X.X-alpha.au3`
+2. Download `UT2004_Installer_v0.3.0-alpha.au3`
 3. Double-click to run, or compile to `.exe`
+
+---
+
+## 🎨 Key Features
+
+### Custom Installation
+- ✅ **Full control** over every installation step
+- ✅ **No CD key required** - OldUnreal patch removes validation
+- ✅ **Self-contained** - All tools bundled (7-Zip, unshield)
+- ✅ **Efficient** - Only extracts what's needed
+- ✅ **Works offline** - Once files are downloaded
+
+### Dark Theme UI
+- UT2004-inspired orange/blue color scheme
+- Clean, modern interface
+- Real-time progress tracking
+- TrayTip notifications for major milestones
+
+### Smart Download Management
+- Resumes interrupted downloads
+- Verifies file integrity
+- Caches downloads for re-installation
+- Optional: Keep or delete cached files
 
 ---
 
@@ -66,82 +83,80 @@ Download the compiled `.exe` from [Releases](../../releases) and run it.
 
 ```
 UT2004-AIO-Installer/
-├── UT2004_Installer_vX.X.X-alpha.au3   - Main installer script
-├── README.md                            - This file
-├── CHANGELOG.md                         - Version history
-├── LICENSE                              - Project license
+├── UT2004_Installer_v0.3.0-alpha.au3  - Main installer script
+├── README.md                           - This file
+├── CHANGELOG.md                        - Version history
+├── LICENSE                             - MIT License
+├── .gitignore                          - Git ignore rules
 │
-└── docs/
-    ├── RESEARCH.md                      - Bonus pack research & download links
-    ├── FILE_STRUCTURE.md                - Installation file mappings
-    └── TESTING.md                       - Testing procedures & checklists
+├── Tools/                              - Bundled tools (FileInstall)
+│   ├── 7za.exe                          - 7-Zip console
+│   ├── 7za.dll                          - 7-Zip library
+│   ├── unshield.exe                    - CAB extractor
+│   └── zlib1.dll                       - unshield dependency
+│
+├── Licenses/                           - Required licenses
+│   ├── 7-Zip License.txt
+│   └── AutoIt License.txt
+│   └── Epic Games TOS.txt
+│   └── Unshield License.txt
+│
+└── docs/                               - Documentation
+    ├── INSTALLATION_PROCESS.md         - How installation works
+    ├── DEVELOPMENT_NOTES.md            - Development process
+    └── ISO_STRUCTURE.md                - ISO format details
+
+Runtime folders (created when installer runs, not committed):
+├── _Downloads/                         - Cached ISO files
+├── _Temp/                              - Temporary extraction
+└── _Temp_CABs/                         - Extracted CAB files
 ```
 
----
-
-## 🎨 Features
-
-### Current (v0.1.1-alpha)
-- **Dark Theme**: UT2004-inspired orange/blue color scheme
-- **Smart Downloads**: Files cached in temp directory for re-use
-- **Progress Tracking**: Real-time download progress with MB/percentage
-- **Silent Installation**: Clean, no-popup installation process
-- **Path Validation**: Checks installation completed successfully
-
-### Planned (v0.2.0+)
-- **Bonus Pack Support**: Install official and community content
-- **Installation Presets**: Recommended, Full, Minimal, Custom
-- **Hash Verification**: SHA1 verification for download integrity
-- **Multi-Mirror Support**: Automatic fallback if download fails
-- **Size Calculator**: Shows required disk space before install
-- **Launch Option**: Start game immediately after installation
+**Convention**: Underscore prefix (_) = temporary/local, No underscore = part of project
 
 ---
 
-## 🧪 Testing
+## 🛠️ Installation Process
 
-Currently in **alpha** - testing on various Windows configurations.
+Our custom installer works as follows:
 
-If you find bugs or have suggestions, please open an issue!
+1. **Download UT2004.ISO** from files.oldunreal.net (~2.76 GB)
+2. **Extract CAB files** from ISO using 7-Zip (flattened structure)
+3. **Extract game files** from each CAB using unshield
+4. **Download OldUnreal patch** (latest community patch)
+5. **Apply patch** to installation
+6. **Create shortcuts** (Desktop + Start Menu)
+7. **Write registry** (install location only - no CD key!)
+8. **Complete!**
 
 ---
 
 ## 🙏 Credits
 
-- **[OldUnreal Team](https://github.com/OldUnreal)** - For maintaining UT2004 patches and installers
-- **[Unreal Archive](https://unrealarchive.org/)** - For hosting community bonus packs
+- **[OldUnreal Team](https://github.com/OldUnreal)** - For maintaining UT2004 patches
+- **[7-Zip](https://www.7-zip.org/)** - Igor Pavlov (LGPL)
+- **[unshield](https://github.com/twogood/unshield)** - David Eriksson (MIT)
 - **Epic Games** - For the original Unreal Tournament 2004
-- **Community** - For all the amazing bonus content over the years
+- **Community** - For keeping the game alive
 
 ---
 
 ## 📄 License
 
-This installer is a community project. UT2004 and all related content are property of Epic Games.
+This installer: MIT License (see [LICENSE](LICENSE))
 
-See [LICENSE](LICENSE) for details.
+Bundled tools: See [Licenses/](Licenses/) for individual tool licenses
 
----
-
-## 🔗 Useful Links
-
-- [OldUnreal UT2004 Patches](https://github.com/OldUnreal/UT2004Patches)
-- [Unreal Archive](https://unrealarchive.org/unreal-tournament-2004/)
-- [PCGamingWiki - UT2004](https://www.pcgamingwiki.com/wiki/Unreal_Tournament_2004)
-- [UT2004 Community Discord](https://discord.gg/unrealtournament)
+UT2004 game content: Property of Epic Games
 
 ---
 
 ## 💬 Support
 
-Having issues? Check the [Issues](../../issues) page or create a new issue with:
-- Windows version
-- Installation path used
-- Error message or behavior
-- Any relevant log files
+Having issues? Check the [Issues](../../issues) page or create a new issue.
 
 ---
 
-**Current Version**: v0.1.1-alpha  
-**Status**: 🚧 In Active Development  
-**Last Updated**: February 14, 2026
+**Current Version**: v0.3.0-alpha  
+**Status**: 🚧 In Active Development (Fresh Start!)  
+**Last Updated**: February 15, 2026
