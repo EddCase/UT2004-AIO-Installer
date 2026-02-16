@@ -53,7 +53,7 @@ Simply download `UT2004_Installer.exe` and run - no other files needed!
 
 **This installer is safe:**
 - ✅ **100% Open Source** - All code visible on GitHub
-- ✅ **Scanned on VirusTotal** - View scan results [here](#) (link added when available)
+- ✅ **Scanned on VirusTotal** - [View scan results](https://www.virustotal.com/gui/file/1f90853b758f708f2fca84558d7ea2e0969e930bf1d70274d14fa93350751f2b/detection)
 - ✅ **Submitted to Microsoft** as false positive
 - ✅ **Community verified** - Build from source yourself if concerned
 
