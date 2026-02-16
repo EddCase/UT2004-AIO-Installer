@@ -1,15 +1,28 @@
+#Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_Icon=UT2004.ico
+#AutoIt3Wrapper_Compression=4
+#AutoIt3Wrapper_UseX64=n
+#AutoIt3Wrapper_Res_Comment=UT2004 All-In-One Community Installer
+#AutoIt3Wrapper_Res_Description=UT2004 All-In-One Community Installer
+#AutoIt3Wrapper_Res_Fileversion=0.6.3.0
+#AutoIt3Wrapper_Res_ProductVersion=0.6.3
+#AutoIt3Wrapper_Res_CompanyName=Community Project
+#AutoIt3Wrapper_Res_LegalCopyright=MIT License
+#AutoIt3Wrapper_Res_Language=1033
+#EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
+
 #cs ----------------------------------------------------------------------------
 
 	AutoIt Version: 3.3.16.1
 	Author:         EddCase
-	Version:        0.5.0
+	Version:        0.6.3
 	
 	Script Function:
 		UT2004 All-In-One Installer
 		Custom installation with full control over the process
 		
 	COMPLETE - Core Installation:
-		✓ GUI with UT2004 Theme
+		✓ GUI with UT2004 Theme (Tabbed Interface)
 		✓ ISO Download with caching
 		✓ CAB Extraction
 		✓ File Installation
@@ -17,12 +30,15 @@
 		✓ Registry (full compatibility set)
 		✓ Shortcuts (Desktop + Start Menu)
 		✓ Cleanup & Keep Files option
+		✓ File Associations (ut2004://, .ut4mod)
+		✓ MegaPack (ECE + Bonus Maps) - Optional
+		✓ Community Bonus Pack 1 (19 maps)
+		✓ Community Bonus Pack 2 Volume 1 (21 maps)
+		✓ Community Bonus Pack 2 Volume 2 (20 maps)
+		✓ Uninstaller (separate Uninstall.exe)
 		
 	TODO - Feature Complete (v1.0):
-		- ECE (Editor's Choice Edition) content
-		- Official bonus packs
-		- Community maps/mods (optional)
-		- Uninstaller
+		- Game settings configuration (resolution, refresh rate)
 		- Better error recovery
 
 #ce ----------------------------------------------------------------------------
@@ -79,8 +95,8 @@
 	Global $g_sTempCABs = $g_sTempDir & "\_Temp_CABs"      ; Extracted CAB files
 	
 	; Tool paths (bundled with installer)
-	Global $g_s7Zip = @ScriptDir & "\Tools\7z.exe"
-	Global $g_sUnshield = @ScriptDir & "\Tools\unshield.exe"
+	Global $g_s7Zip = @TempDir & "\UT2004_Install_Tools\7z.exe"
+	Global $g_sUnshield = @TempDir & "\UT2004_Install_Tools\unshield.exe"
 	
 	; Download URLs
 	Global $g_sISOUrl = "https://files.oldunreal.net/UT2004.ISO"
@@ -107,6 +123,26 @@
 	Global $g_idLabelKeepFiles      ; Label for checkbox (clickable)
 	Global $g_idCheckboxFileAssoc   ; "Register file associations" checkbox
 	Global $g_idLabelFileAssoc      ; Label for file associations checkbox
+	Global $g_idCheckboxMegaPack    ; "Install MegaPack" checkbox
+	Global $g_idLabelMegaPack       ; Label for MegaPack checkbox
+	Global $g_idCheckboxCBP1        ; "Install CBP1" checkbox
+	Global $g_idLabelCBP1           ; Label for CBP1 checkbox
+	Global $g_idCheckboxCBP2V1      ; "Install CBP2 Vol 1" checkbox
+	Global $g_idLabelCBP2V1         ; Label for CBP2 Vol 1 checkbox
+	Global $g_idCheckboxCBP2V2      ; "Install CBP2 Vol 2" checkbox
+	Global $g_idLabelCBP2V2         ; Label for CBP2 Vol 2 checkbox
+	
+	; Tab system
+	; WHAT: Variables for tabbed interface
+	; WHY: Organize UI into logical sections, reduce clutter
+	; HOW: Track current tab, store control IDs per tab for show/hide
+	Global $g_iCurrentTab = 1       ; Currently displayed tab (1=Installation, 2=Official Content, 3=Options)
+	Global $g_idTabBtn1             ; Installation tab button
+	Global $g_idTabBtn2             ; Official Content tab button
+	Global $g_idTabBtn3             ; Options tab button
+	Global $g_aTab1Controls[10]     ; Array of controls for Installation tab
+	Global $g_aTab2Controls[20]     ; Array of controls for Official Content tab
+	Global $g_aTab3Controls[20]     ; Array of controls for Options tab
 	
 	; WHAT: Mapping between clickable labels and their checkboxes
 	; WHY: Generic system - one function handles all label clicks
@@ -155,6 +191,12 @@
 		; HOW: CreateGUI() function creates window and all controls
 		CreateGUI()
 		
+		; Load saved settings (if any)
+		; WHAT: Restore user preferences from installer_settings.ini
+		; WHY: Convenience for repeat testers/users
+		; HOW: LoadSettings() reads INI and sets checkbox states
+		LoadSettings()
+		
 		; Message loop
 		; WHAT: Wait for and process user interactions (button clicks, window close, etc.)
 		; WHY: GUI needs to respond to user actions
@@ -182,6 +224,24 @@
 					; HOW: Validate inputs, then begin installation phases
 					OnInstallClicked()
 					
+				Case $g_idTabBtn1
+					; WHAT: User clicked Installation tab button
+					; WHY: Switch to Installation tab
+					; HOW: Call SwitchToTab with tab number 1
+					SwitchToTab(1)
+					
+				Case $g_idTabBtn2
+					; WHAT: User clicked Official Content tab button
+					; WHY: Switch to Official Content tab
+					; HOW: Call SwitchToTab with tab number 2
+					SwitchToTab(2)
+					
+				Case $g_idTabBtn3
+					; WHAT: User clicked Options tab button
+					; WHY: Switch to Options tab
+					; HOW: Call SwitchToTab with tab number 3
+					SwitchToTab(3)
+					
 				Case Else
 					; WHAT: Check if a checkbox label was clicked
 					; WHY: Generic system - handles all label clicks in one place
@@ -198,40 +258,34 @@
 		; WHAT: Extract 7-Zip and unshield from compiled installer
 		; WHY: These tools are embedded in the .exe, need to extract before use
 		; HOW: FileInstall() extracts files that were embedded at compile time
-		;      The files must exist in the source location when compiling
+		;      Extracts to TEMP directory for cleaner installation
 		
-		; Create Tools directory if it doesn't exist
-		; WHAT: Make sure we have somewhere to put the extracted tools
-		; WHY: FileInstall will fail if the directory doesn't exist
-		; HOW: DirCreate creates the folder, won't error if already exists
-		If Not FileExists(@ScriptDir & "\Tools") Then
-			DirCreate(@ScriptDir & "\Tools")
+		; Create Tools directory in temp if it doesn't exist
+		Local $sToolsDir = @TempDir & "\UT2004_Install_Tools"
+		If Not FileExists($sToolsDir) Then
+			DirCreate($sToolsDir)
 		EndIf
 		
-		; NOTE: FileInstall lines are commented out for now because we don't have the actual tool files yet
-		; When you add the tools to the Tools/ folder, uncomment these lines
-		; The syntax is: FileInstall("source_path", "destination_path", overwrite_flag)
-		;   - source_path: Where the file is during development
-		;   - destination_path: Where to extract it at runtime
-		;   - 1 = overwrite if exists
-		
-		FileInstall("Tools\7z.exe", @ScriptDir & "\Tools\7z.exe", 1)
-		FileInstall("Tools\7z.dll", @ScriptDir & "\Tools\7z.dll", 1)
-		FileInstall("Tools\unshield.exe", @ScriptDir & "\Tools\unshield.exe", 1)
-		FileInstall("Tools\zlib1.dll", @ScriptDir & "\Tools\zlib1.dll", 1)
+		; Extract tools to temp directory
+		FileInstall("Tools\7z.exe", $sToolsDir & "\7z.exe", 1)
+		FileInstall("Tools\7z.dll", $sToolsDir & "\7z.dll", 1)
+		FileInstall("Tools\unshield.exe", $sToolsDir & "\unshield.exe", 1)
+		FileInstall("Tools\zlib1.dll", $sToolsDir & "\zlib1.dll", 1)
+		FileInstall("Tools\Uninstaller.exe", $sToolsDir & "\Uninstaller.exe", 1)
 		
 		; Verify tools extracted successfully
-		; WHAT: Make sure the critical tools are available
-		; WHY: Better to fail early with clear error than fail later mysteriously
-		; HOW: Check if files exist, show error and exit if missing
-		
-		If Not FileExists($g_s7Zip) Then
+		If Not FileExists($sToolsDir & "\7z.exe") Then
 		    MsgBox(16, "Missing Tool", "Failed to extract 7z.exe" & @CRLF & "Installer may be corrupt.")
 		    Exit
 		EndIf
 		
-		If Not FileExists($g_sUnshield) Then
+		If Not FileExists($sToolsDir & "\unshield.exe") Then
 		    MsgBox(16, "Missing Tool", "Failed to extract unshield.exe" & @CRLF & "Installer may be corrupt.")
+		    Exit
+		EndIf
+		
+		If Not FileExists($sToolsDir & "\Uninstaller.exe") Then
+		    MsgBox(16, "Missing Tool", "Failed to extract Uninstaller.exe" & @CRLF & "Installer may be corrupt.")
 		    Exit
 		EndIf
 		
@@ -240,178 +294,49 @@
 
 #Region GUI Creation
 	Func CreateGUI()
-		; WHAT: Create the main installer window with UT2004 theming
-		; WHY: User needs a GUI to interact with the installer
-		; HOW: Use GUICreate and GUICtrlCreate functions to build interface
-		;      Apply UT2004 color scheme throughout
+		; WHAT: Create the main installer window with tabbed interface
+		; WHY: User needs a clean, organized GUI
+		; HOW: Create window, tab buttons, tab content areas, always-visible progress section
 		
-		; Create main window
-		; WHAT: The main installer window
-		; WHY: Container for all our controls
-		; HOW: GUICreate(title, width, height, x, y, style)
-		;   - -1, -1: Center on screen
-		;   - $WS_CAPTION + $WS_SYSMENU: Title bar with close button, no resize
-		;   - $WS_EX_TOPMOST: Keep window on top (optional, can remove)
-		$g_hGUI = GUICreate("Unreal Tournament 2004 - Community Installer", 600, 505, -1, -1, _
+		; Create main window - 640x480 old-school size!
+		$g_hGUI = GUICreate("UT2004 Community Installer v0.6.3", 640, 480, -1, -1, _
 				BitOR($WS_CAPTION, $WS_SYSMENU))
 		
-		; WHAT: Set window background color
-		; WHY: Match UT2004's dark theme
-		; HOW: GUISetBkColor sets background, takes RGB color value
+		; Set UT2004 dark theme background
 		GUISetBkColor($COLOR_BG_DARK, $g_hGUI)
 		
-		; Title Label
-		; WHAT: Large title at top of window
-		; WHY: Clearly identify what this installer does
-		; HOW: GUICtrlCreateLabel(text, x, y, width, height, style)
-		;   - $SS_CENTER: Center the text
-		;   - Position: 20 pixels from top, full width minus margins
-		Local $idLabelTitle = GUICtrlCreateLabel("UT2004 All-In-One Installer", 20, 20, 560, 40, $SS_CENTER)
-		GUICtrlSetFont(-1, 18, 800)  ; -1 = last created control, 18pt, bold (800)
-		GUICtrlSetColor(-1, $COLOR_UT_ORANGE)  ; Orange text
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)  ; Transparent background
+		; Create tab buttons at top
+		CreateTabButtons()
 		
-		; Version Label
-		; WHAT: Version number under title
-		; WHY: User knows which version they're running
-		; HOW: Similar to title but smaller, dimmed color
-		Local $idLabelVersion = GUICtrlCreateLabel("Version 0.3.0-alpha", 20, 65, 560, 20, $SS_CENTER)
-		GUICtrlSetFont(-1, 9)
-		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		; Create all three tab content areas
+		; Each function returns an array of control IDs
+		$g_aTab1Controls = CreateTab1_Installation()
+		$g_aTab2Controls = CreateTab2_OfficialContent()
+		$g_aTab3Controls = CreateTab3_Options()
 		
-		; Installation Path Section
-		; WHAT: Label for installation path input
-		; WHY: User needs to know what they're selecting
-		; HOW: Label positioned above the input box
-		Local $idLabelInstallPath = GUICtrlCreateLabel("Installation Directory:", 20, 110, 560, 20)
-		GUICtrlSetColor(-1, $COLOR_TEXT)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		; === ALWAYS VISIBLE SECTION (Bottom) ===
+		; This section never changes regardless of tab
 		
-		; Installation path input box
-		; WHAT: Text box showing where UT2004 will be installed
-		; WHY: User can see and edit install location
-		; HOW: Input control with default path
-		;   - Width: 470 (leaves room for Browse button)
-		$g_idInputInstallPath = GUICtrlCreateInput($g_sInstallPath, 20, 135, 470, 25)
-		GUICtrlSetColor(-1, $COLOR_TEXT)  ; Light gray text
-		GUICtrlSetBkColor(-1, $COLOR_BG_MID)  ; Mid-dark background
-		
-		; Browse button
-		; WHAT: Button to open folder picker dialog
-		; WHY: Easier than typing a path manually
-		; HOW: Button positioned next to input box
-		;   - X: 500 (right of input box)
-		;   - Width: 80
-		$g_idBtnBrowse = GUICtrlCreateButton("Browse...", 500, 135, 80, 25)
-		GUICtrlSetColor(-1, $COLOR_TEXT)
-		GUICtrlSetBkColor(-1, $COLOR_UT_BLUE)  ; Blue button
-		
-		; CD Key Section (Optional)
-		; WHAT: Label for CD key input
-		; WHY: Optional - allows users to add CD key for server stats
-		; HOW: Label positioned below installation path
-		Local $idLabelCDKey = GUICtrlCreateLabel("CD Key (Optional - for online server stats):", 20, 175, 560, 20)
-		GUICtrlSetColor(-1, $COLOR_TEXT)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
-		
-		; CD Key input box
-		; WHAT: Text box for optional CD key
-		; WHY: Servers track stats by CD key
-		; HOW: Input control with placeholder hint
-		;   - Format: XXXXX-XXXXX-XXXXX-XXXXX (validated on install)
-		$g_idInputCDKey = GUICtrlCreateInput("", 20, 200, 470, 25)
-		GUICtrlSetColor(-1, $COLOR_TEXT)
+		; Separator line (visual only)
+		Local $idSeparator = GUICtrlCreateLabel("", 10, 350, 620, 2)
 		GUICtrlSetBkColor(-1, $COLOR_BG_MID)
-		GUICtrlSendMsg(-1, 0x1501, True, "XXXXX-XXXXX-XXXXX-XXXXX")  ; EM_SETCUEBANNER - placeholder text
-		
-		; CD Key hint
-		; WHAT: Explain CD key is optional
-		; WHY: User should know they can skip it
-		; HOW: Dimmed text as a hint
-		Local $idLabelCDKeyHint = GUICtrlCreateLabel("(Leave blank if you don't have one - not required for single player)", 40, 230, 540, 20)
-		GUICtrlSetFont(-1, 8)
-		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
-		
-		; Options Section
-		; WHAT: Checkbox for keeping installer files (without text)
-		; WHY: AutoIt checkboxes don't support text coloring, so we use a separate label
-		; HOW: Create checkbox without text, then label next to it
-		$g_idCheckboxKeepFiles = GUICtrlCreateCheckbox("", 20, 260, 20, 20)
-		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
-		
-		; Label for checkbox (clickable to toggle checkbox)
-		; WHAT: Themed label next to checkbox
-		; WHY: We can color this label, unlike checkbox text
-		; HOW: Position it right after the checkbox, register in mapping system
-		$g_idLabelKeepFiles = GUICtrlCreateLabel("Keep installer files in game directory (~2.8 GB)", 45, 262, 535, 20)
-		GUICtrlSetColor(-1, $COLOR_TEXT)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
-		
-		; Register this label/checkbox pair for click handling
-		; WHAT: Add to our mapping array so clicking label toggles checkbox
-		; WHY: Reusable system - works for all future checkboxes too
-		; HOW: Call RegisterLabelCheckboxPair() helper function
-		RegisterLabelCheckboxPair($g_idLabelKeepFiles, $g_idCheckboxKeepFiles)
-		
-		; Info label about what gets kept
-		; WHAT: Explain what "keep files" means
-		; WHY: User should know what they're keeping
-		; HOW: Dimmed text as a hint/note
-		Local $idLabelKeepInfo = GUICtrlCreateLabel("(Saves ISO and patch for future use)", 40, 285, 540, 20)
-		GUICtrlSetFont(-1, 8)
-		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
-		
-		; File associations checkbox
-		; WHAT: Checkbox for registering file associations
-		; WHY: User might not want to override existing associations
-		; HOW: Create checkbox without text, then label next to it
-		$g_idCheckboxFileAssoc = GUICtrlCreateCheckbox("", 20, 310, 20, 20)
-		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
-		
-		; Label for file associations checkbox (clickable)
-		; WHAT: Themed label next to checkbox
-		; WHY: We can color this label, unlike checkbox text
-		; HOW: Position it right after the checkbox, register in mapping system
-		$g_idLabelFileAssoc = GUICtrlCreateLabel("Register file associations (ut2004:// protocol and .ut4mod files)", 45, 312, 535, 20)
-		GUICtrlSetColor(-1, $COLOR_TEXT)
-		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
-		
-		; Register this label/checkbox pair for click handling
-		RegisterLabelCheckboxPair($g_idLabelFileAssoc, $g_idCheckboxFileAssoc)
 		
 		; Progress Bar
-		; WHAT: Visual indicator of installation progress
-		; WHY: User needs to see installation is working
-		; HOW: Progress bar control, initially at 0%
-		;   - PBS_SMOOTH: Smooth progress (not chunky blocks)
-		$g_idProgressBar = GUICtrlCreateProgress(20, 355, 560, 25)
-		GUICtrlSetColor(-1, $COLOR_UT_ORANGE)  ; Orange progress bar
+		$g_idProgressBar = GUICtrlCreateProgress(20, 360, 600, 25)
+		GUICtrlSetColor(-1, $COLOR_UT_ORANGE)
 		
 		; Status Label
-		; WHAT: Text description of current step
-		; WHY: User should know what's happening
-		; HOW: Label below progress bar, will be updated during installation
-		$g_idLabelStatus = GUICtrlCreateLabel("Ready to install", 20, 390, 560, 20, $SS_CENTER)
+		$g_idLabelStatus = GUICtrlCreateLabel("Ready to install", 20, 395, 600, 20, $SS_CENTER)
 		GUICtrlSetColor(-1, $COLOR_TEXT)
 		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
 		
 		; Install Button
-		; WHAT: Big button to start installation
-		; WHY: Primary action of the installer
-		; HOW: Large, centered button with orange background
-		;   - Height: 40 (bigger than other buttons)
-		$g_idBtnInstall = GUICtrlCreateButton("Install UT2004", 200, 435, 200, 40)
-		GUICtrlSetFont(-1, 12, 600)  ; 12pt, semi-bold
-		GUICtrlSetColor(-1, $COLOR_BG_DARK)  ; Dark text on orange
-		GUICtrlSetBkColor(-1, $COLOR_UT_ORANGE)  ; Orange button
+		$g_idBtnInstall = GUICtrlCreateButton("Install UT2004", 220, 425, 200, 40)
+		GUICtrlSetFont(-1, 12, 600)
+		GUICtrlSetColor(-1, $COLOR_BG_DARK)
+		GUICtrlSetBkColor(-1, $COLOR_UT_ORANGE)
 		
 		; Show the window
-		; WHAT: Make the window visible
-		; WHY: User needs to see the GUI we just created
-		; HOW: GUISetState displays the window
 		GUISetState(@SW_SHOW, $g_hGUI)
 	EndFunc
 #EndRegion
@@ -576,6 +501,12 @@
 			EndIf
 		EndIf
 		
+		; Save current settings for next run
+		; WHAT: Store checkbox states to INI file
+		; WHY: Convenience for repeat installations (especially testing)
+		; HOW: SaveSettings() writes to installer_settings.ini
+		SaveSettings()
+		
 		; Disable UI during installation
 		; WHAT: Prevent user from changing things mid-install
 		; WHY: Changing paths/keys during installation would cause problems
@@ -586,6 +517,13 @@
 		GUICtrlSetState($g_idBtnInstall, $GUI_DISABLE)
 		GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_DISABLE)
 		GUICtrlSetState($g_idCheckboxFileAssoc, $GUI_DISABLE)
+		GUICtrlSetState($g_idCheckboxMegaPack, $GUI_DISABLE)
+		GUICtrlSetState($g_idCheckboxCBP1, $GUI_DISABLE)
+		GUICtrlSetState($g_idCheckboxCBP2V1, $GUI_DISABLE)
+		GUICtrlSetState($g_idCheckboxCBP2V2, $GUI_DISABLE)
+		GUICtrlSetState($g_idTabBtn1, $GUI_DISABLE)
+		GUICtrlSetState($g_idTabBtn2, $GUI_DISABLE)
+		GUICtrlSetState($g_idTabBtn3, $GUI_DISABLE)
 		
 		; Initialize installation log
 		; WHAT: Create install.log file
@@ -660,17 +598,6 @@
 			Return False
 		EndIf
 		
-		; Phase 5b: Apply patch, write registry, create uninstall entry
-		; WHAT: Finalize installation with patch and system integration
-		; WHY: Need latest patch and proper registry entries
-		; HOW: Download patch, extract, write registry
-		If Not Phase5b_PatchAndRegistry() Then
-			; Phase 5b failed
-			UpdateStatus("Installation failed: Could not apply patch or write registry")
-			InstallationFailed("Failed to apply patch and write registry entries")
-			Return False
-		EndIf
-		
 		; Phase 5c: Create shortcuts and cleanup
 		; WHAT: Final polish - shortcuts and temp cleanup
 		; WHY: User needs easy access, clean system
@@ -678,6 +605,90 @@
 		If Not Phase5c_ShortcutsAndCleanup() Then
 			; Phase 5c failed (non-critical)
 			LogMessage("WARNING: Phase 5c failed, but installation is complete")
+		EndIf
+		
+		; Phase 6: Install MegaPack (optional)
+		; WHAT: Install ECE content and 9 bonus maps
+		; WHY: User wants additional official content
+		; HOW: Download multi-part ZIP, extract, copy to game
+		Local $bInstallMegaPack = (GUICtrlRead($g_idCheckboxMegaPack) = $GUI_CHECKED)
+		
+		If $bInstallMegaPack Then
+			If Not Phase6_InstallMegaPack() Then
+				; Phase 6 failed (non-critical, user still has base game)
+				LogMessage("WARNING: Phase 6 failed - MegaPack not installed")
+				MsgBox(48, "MegaPack Installation Failed", "The base game installed successfully, but the MegaPack (bonus content) failed to install." & @CRLF & @CRLF & _
+						"You can try installing the MegaPack manually later." & @CRLF & @CRLF & _
+						"Check install.log for details.")
+			EndIf
+		Else
+			LogMessage("MegaPack installation skipped (user choice)")
+		EndIf
+		
+		; Phase 7: Install CBP1 (optional)
+		; WHAT: Install Community Bonus Pack 1 (19 maps)
+		; WHY: User wants additional community content
+		; HOW: Download multi-part ZIP, extract, copy to game
+		Local $bInstallCBP1 = (GUICtrlRead($g_idCheckboxCBP1) = $GUI_CHECKED)
+		
+		If $bInstallCBP1 Then
+			If Not Phase7_InstallCBP1() Then
+				; Phase 7 failed (non-critical, user still has base game)
+				LogMessage("WARNING: Phase 7 failed - CBP1 not installed")
+				MsgBox(48, "CBP1 Installation Failed", "The base game installed successfully, but Community Bonus Pack 1 failed to install." & @CRLF & @CRLF & _
+						"You can try installing CBP1 manually later." & @CRLF & @CRLF & _
+						"Check install.log for details.")
+			EndIf
+		Else
+			LogMessage("CBP1 installation skipped (user choice)")
+		EndIf
+		
+		; Phase 8: Install CBP2 Volume 1 (optional)
+		; WHAT: Install Community Bonus Pack 2 Volume 1 (21 maps)
+		; WHY: User wants additional community content
+		; HOW: Download multi-part ZIP, extract, copy to game
+		Local $bInstallCBP2V1 = (GUICtrlRead($g_idCheckboxCBP2V1) = $GUI_CHECKED)
+		
+		If $bInstallCBP2V1 Then
+			If Not Phase8_InstallCBP2V1() Then
+				; Phase 8 failed (non-critical, user still has base game)
+				LogMessage("WARNING: Phase 8 failed - CBP2 Volume 1 not installed")
+				MsgBox(48, "CBP2 Volume 1 Installation Failed", "The base game installed successfully, but Community Bonus Pack 2 Volume 1 failed to install." & @CRLF & @CRLF & _
+						"You can try installing CBP2 Volume 1 manually later." & @CRLF & @CRLF & _
+						"Check install.log for details.")
+			EndIf
+		Else
+			LogMessage("CBP2 Volume 1 installation skipped (user choice)")
+		EndIf
+		
+		; Phase 9: Install CBP2 Volume 2 (optional)
+		; WHAT: Install Community Bonus Pack 2 Volume 2 (20 maps)
+		; WHY: User wants additional community content
+		; HOW: Download multi-part ZIP, extract, copy to game
+		Local $bInstallCBP2V2 = (GUICtrlRead($g_idCheckboxCBP2V2) = $GUI_CHECKED)
+		
+		If $bInstallCBP2V2 Then
+			If Not Phase9_InstallCBP2V2() Then
+				; Phase 9 failed (non-critical, user still has base game)
+				LogMessage("WARNING: Phase 9 failed - CBP2 Volume 2 not installed")
+				MsgBox(48, "CBP2 Volume 2 Installation Failed", "The base game installed successfully, but Community Bonus Pack 2 Volume 2 failed to install." & @CRLF & @CRLF & _
+						"You can try installing CBP2 Volume 2 manually later." & @CRLF & @CRLF & _
+						"Check install.log for details.")
+			EndIf
+		Else
+			LogMessage("CBP2 Volume 2 installation skipped (user choice)")
+		EndIf
+		
+		; Phase 5b: Apply patch and write registry (ALWAYS LAST!)
+		; WHAT: Apply OldUnreal patch and finalize system integration
+		; WHY: Patch must overwrite any outdated files from base game or bonus packs
+		; HOW: Download patch, extract, write registry
+		; NOTE: This is run AFTER Phase 6 to ensure patch overwrites everything
+		If Not Phase5b_PatchAndRegistry() Then
+			; Phase 5b failed
+			UpdateStatus("Installation failed: Could not apply patch or write registry")
+			InstallationFailed("Failed to apply patch and write registry entries")
+			Return False
 		EndIf
 		
 		; Installation complete!
@@ -772,7 +783,6 @@
 		; WHY: We need it and don't have it (or it was wrong size)
 		; HOW: Call DownloadFileWithProgress function
 		UpdateStatus("Downloading UT2004.ISO from files.oldunreal.net...")
-		TrayTip("UT2004 Installer", "Downloading UT2004 (~2.8 GB) - This may take a while...", 10, 1)
 		LogMessage("Starting ISO download from: " & $g_sISOUrl)
 		
 		If Not DownloadFileWithProgress($g_sISOUrl, $sISOPath, 0, 50) Then
@@ -808,7 +818,6 @@
 		
 		UpdateStatus("ISO downloaded successfully: " & Round($iDownloadedSize / 1073741824, 2) & " GB")
 		LogMessage("ISO download complete and verified: " & $iDownloadedSize & " bytes")
-		TrayTip("UT2004 Installer", "Download complete! Installing...", 3, 1)
 		
 		Return True
 	EndFunc
@@ -1191,6 +1200,23 @@
 		; Update progress to 90%
 		GUICtrlSetData($g_idProgressBar, 90)
 		
+		; Copy Uninstaller.exe to System folder
+		UpdateStatus("Installing uninstaller...")
+		LogMessage("Copying Uninstaller.exe to System folder")
+		Local $sUninstallSource = @TempDir & "\UT2004_Install_Tools\Uninstaller.exe"
+		Local $sUninstallDest = $sInstallDir & "\System\Uninstaller.exe"
+		
+		If FileExists($sUninstallSource) Then
+			FileCopy($sUninstallSource, $sUninstallDest, 1)
+			If FileExists($sUninstallDest) Then
+				LogMessage("Uninstaller.exe copied successfully")
+			Else
+				LogMessage("WARNING: Failed to copy Uninstaller.exe")
+			EndIf
+		Else
+			LogMessage("WARNING: Uninstaller.exe not found in tools directory")
+		EndIf
+		
 		UpdateStatus("Files copied successfully")
 		LogMessage("File copy complete - all game files installed")
 		
@@ -1253,7 +1279,6 @@
 		Local $sPatchFile = $g_sDownloadDir & "\OldUnreal-Patch.zip"
 		UpdateStatus("Downloading OldUnreal patch...")
 		LogMessage("Downloading patch to: " & $sPatchFile)
-		TrayTip("UT2004 Installer", "Downloading latest patch...", 5, 1)
 		
 		; Use InetGet to download (90% → 92%)
 		Local $hDownload = InetGet($sDownloadURL, $sPatchFile, $INET_FORCERELOAD, $INET_DOWNLOADBACKGROUND)
@@ -1351,24 +1376,19 @@
 		UpdateStatus("Creating uninstall entry...")
 		LogMessage("Creating uninstall entry")
 		
-		Local $aUninstallKeys[2]
-		$aUninstallKeys[0] = "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\UT2004_Community"
-		$aUninstallKeys[1] = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\UT2004_Community"
+		; Create uninstall entry (only in WOW6432Node for 32-bit app)
+		Local $sUninstallKey = "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\UT2004_Community"
 		
-		For $i = 0 To 1
-			Local $sUninstallKey = $aUninstallKeys[$i]
-			
-			RegWrite($sUninstallKey, "DisplayName", "REG_SZ", "Unreal Tournament 2004")
-			RegWrite($sUninstallKey, "DisplayVersion", "REG_SZ", $sPatchVersion)
-			RegWrite($sUninstallKey, "Publisher", "REG_SZ", "Epic Games / Community Installer")
-			RegWrite($sUninstallKey, "DisplayIcon", "REG_SZ", $g_sInstallPath & "\System\UT2004.exe")
-			RegWrite($sUninstallKey, "InstallLocation", "REG_SZ", $g_sInstallPath)
-			RegWrite($sUninstallKey, "NoModify", "REG_DWORD", 1)
-			RegWrite($sUninstallKey, "NoRepair", "REG_DWORD", 1)
-			; UninstallString will be added when we create uninstaller in v1.1
-		Next
+		RegWrite($sUninstallKey, "DisplayName", "REG_SZ", "Unreal Tournament 2004")
+		RegWrite($sUninstallKey, "DisplayVersion", "REG_SZ", $sPatchVersion)
+		RegWrite($sUninstallKey, "Publisher", "REG_SZ", "Epic Games / Community Installer")
+		RegWrite($sUninstallKey, "DisplayIcon", "REG_SZ", $g_sInstallPath & "\System\UT2004.exe")
+		RegWrite($sUninstallKey, "InstallLocation", "REG_SZ", $g_sInstallPath)
+		RegWrite($sUninstallKey, "UninstallString", "REG_SZ", '"' & $g_sInstallPath & '\System\Uninstaller.exe"')
+		RegWrite($sUninstallKey, "NoModify", "REG_DWORD", 1)
+		RegWrite($sUninstallKey, "NoRepair", "REG_DWORD", 1)
 		
-		LogMessage("Uninstall entry created in both registry locations")
+		LogMessage("Uninstall entry created in WOW6432Node registry")
 		GUICtrlSetData($g_idProgressBar, 95)
 		
 		; Step 6: Register file associations (if checkbox checked)
@@ -1496,6 +1516,19 @@
 				LogMessage("Patch copied: " & FileGetSize($sInstallerDir & "\OldUnreal-Patch.zip") & " bytes")
 			EndIf
 			
+			; Copy bonus pack files if they exist
+			; MegaPack (4 files)
+			CopyBonusPackParts($g_sTempDir & "\_MegaPack", $sInstallerDir, "UT2004MegaPack", 4)
+			
+			; CBP1 (3 files)
+			CopyBonusPackParts($g_sTempDir & "\_CBP1", $sInstallerDir, "CBP1", 3)
+			
+			; CBP2 Volume 1 (4 files)
+			CopyBonusPackParts($g_sTempDir & "\_CBP2V1", $sInstallerDir, "cbp2_volume1", 4)
+			
+			; CBP2 Volume 2 (4 files)
+			CopyBonusPackParts($g_sTempDir & "\_CBP2V2", $sInstallerDir, "cbp2_volume2", 4)
+			
 			; Copy install log
 			If $g_hLogFile <> 0 And $g_hLogFile <> -1 Then
 				FileFlush($g_hLogFile)  ; Make sure everything is written
@@ -1548,6 +1581,562 @@
 		LogMessage("Phase 5c complete")
 		
 		Return True
+	EndFunc
+	
+	Func Phase6_InstallMegaPack()
+		; WHAT: Download and install MegaPack (ECE + 9 bonus maps)
+		; WHY: User wants official bonus content
+		; HOW: Download 4-part ZIP from GitHub, extract with 7z, copy to game
+		;
+		; RETURN: True if successful, False if failed
+		
+		UpdateStatus("Installing MegaPack...")
+		LogMessage("Starting Phase 6: MegaPack Installation")
+		LogMessage("MegaPack includes: ECE content + 9 bonus maps")
+		
+		; Create temp directory for MegaPack download
+		Local $sMegaPackDir = $g_sTempDir & "\_MegaPack"
+		If Not FileExists($sMegaPackDir) Then
+			DirCreate($sMegaPackDir)
+		EndIf
+		
+		; GitHub URLs for the 4-part split archive
+		Local $aPartURLs[4]
+		$aPartURLs[0] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/UT2004MegaPack.z01"
+		$aPartURLs[1] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/UT2004MegaPack.z02"
+		$aPartURLs[2] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/UT2004MegaPack.z03"
+		$aPartURLs[3] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/UT2004MegaPack.zip"
+		
+		Local $aPartFiles[4]
+		$aPartFiles[0] = $sMegaPackDir & "\UT2004MegaPack.z01"
+		$aPartFiles[1] = $sMegaPackDir & "\UT2004MegaPack.z02"
+		$aPartFiles[2] = $sMegaPackDir & "\UT2004MegaPack.z03"
+		$aPartFiles[3] = $sMegaPackDir & "\UT2004MegaPack.zip"
+		
+		; Download all 4 parts
+		; WHAT: Download each part of the split archive
+		; WHY: GitHub has 100 MB file size limit
+		; HOW: Loop through parts, download each with InetGet
+		UpdateStatus("Downloading MegaPack (part 1 of 4)...")
+		LogMessage("Downloading MegaPack parts from GitHub")
+		
+		For $i = 0 To 3
+			Local $sPartName = "Part " & ($i + 1) & " of 4"
+			UpdateStatus("Downloading MegaPack (" & $sPartName & ")...")
+			LogMessage("Downloading: " & $aPartURLs[$i])
+			
+			; Download this part (background download)
+			Local $hDownload = InetGet($aPartURLs[$i], $aPartFiles[$i], $INET_FORCERELOAD, $INET_DOWNLOADBACKGROUND)
+			
+			; Wait for download with progress
+			While Not InetGetInfo($hDownload, $INET_DOWNLOADCOMPLETE)
+				Local $iBytesRead = InetGetInfo($hDownload, $INET_DOWNLOADREAD)
+				Local $iTotalSize = InetGetInfo($hDownload, $INET_DOWNLOADSIZE)
+				
+				If $iTotalSize > 0 Then
+					Local $sMB = Round($iBytesRead / 1048576, 1)
+					Local $sTotalMB = Round($iTotalSize / 1048576, 1)
+					GUICtrlSetData($g_idLabelStatus, "Downloading " & $sPartName & ": " & $sMB & " MB / " & $sTotalMB & " MB")
+				EndIf
+				
+				Sleep(100)
+			WEnd
+			InetClose($hDownload)
+			
+			; Verify download
+			If Not FileExists($aPartFiles[$i]) Then
+				LogMessage("ERROR: Failed to download " & $sPartName)
+				Return False
+			EndIf
+			
+			LogMessage($sPartName & " downloaded: " & FileGetSize($aPartFiles[$i]) & " bytes")
+		Next
+		
+		LogMessage("All 4 parts downloaded successfully")
+		GUICtrlSetData($g_idProgressBar, 96)
+		
+		; Extract MegaPack
+		; WHAT: Extract the multi-part 7z archive
+		; WHY: Need to get the game files out of the ZIP
+		; HOW: 7z.exe automatically combines .z01, .z02, .z03 when extracting .zip
+		UpdateStatus("Extracting MegaPack...")
+		LogMessage("Extracting MegaPack archive")
+		
+		Local $sMegaPackExtracted = $sMegaPackDir & "\_Extracted"
+		Local $s7zCommand = '"' & $g_s7Zip & '" x "' & $aPartFiles[3] & '" -o"' & $sMegaPackExtracted & '" -y'
+		LogMessage("Executing: " & $s7zCommand)
+		
+		Local $iExitCode = RunWait($s7zCommand, @ScriptDir, @SW_HIDE)
+		
+		If $iExitCode <> 0 Then
+			LogMessage("ERROR: MegaPack extraction failed with exit code: " & $iExitCode)
+			Return False
+		EndIf
+		
+		LogMessage("MegaPack extracted successfully")
+		GUICtrlSetData($g_idProgressBar, 97)
+		
+		; Copy MegaPack contents to game directory
+		; WHAT: Copy extracted files to install directory
+		; WHY: Merge MegaPack content with base game
+		; HOW: Copy each folder, merging with existing folders
+		UpdateStatus("Installing MegaPack files...")
+		LogMessage("Copying MegaPack files to: " & $g_sInstallPath)
+		
+		; MegaPack files are directly in _Extracted folder
+		Local $sMegaPackSource = $sMegaPackExtracted
+		
+		If Not FileExists($sMegaPackSource) Then
+			LogMessage("ERROR: MegaPack source folder not found: " & $sMegaPackSource)
+			Return False
+		EndIf
+		
+		; Copy each folder
+		Local $aFolders[9] = ["Animations", "Maps", "Music", "Sounds", "Speech", "StaticMeshes", "System", "Textures", "Web"]
+		
+		For $sFolder In $aFolders
+			Local $sSource = $sMegaPackSource & "\" & $sFolder
+			Local $sDest = $g_sInstallPath & "\" & $sFolder
+			
+			If FileExists($sSource) Then
+				LogMessage("Copying: " & $sFolder)
+				
+				; Copy folder contents (merge with existing)
+				DirCopy($sSource, $sDest, 1)  ; 1 = overwrite
+				
+				If @error Then
+					LogMessage("WARNING: Error copying " & $sFolder)
+				Else
+					LogMessage($sFolder & " copied successfully")
+				EndIf
+			Else
+				LogMessage("WARNING: " & $sFolder & " not found in MegaPack")
+			EndIf
+		Next
+		
+		LogMessage("MegaPack files copied to game directory")
+		GUICtrlSetData($g_idProgressBar, 98)
+		
+		; Verify installation
+		; WHAT: Check that some key MegaPack files were installed
+		; WHY: Make sure installation actually worked
+		; HOW: Check for a few key map files
+		Local $bVerified = False
+		If FileExists($g_sInstallPath & "\Maps\AS-BP2-Acatana.ut2") And _
+		   FileExists($g_sInstallPath & "\Maps\DM-BP2-GoopGod.ut2") Then
+			$bVerified = True
+			LogMessage("MegaPack installation verified (maps found)")
+		Else
+			LogMessage("WARNING: MegaPack verification failed (maps not found)")
+		EndIf
+		
+		UpdateStatus("MegaPack installation complete")
+		LogMessage("Phase 6 complete")
+		
+		Return $bVerified
+	EndFunc
+	
+	Func Phase7_InstallCBP1()
+		; WHAT: Download and install Community Bonus Pack 1 (19 maps)
+		; WHY: User wants additional community maps
+		; HOW: Download 3-part ZIP from GitHub, extract with 7z, copy to game
+		;
+		; RETURN: True if successful, False if failed
+		
+		UpdateStatus("Installing Community Bonus Pack 1...")
+		LogMessage("Starting Phase 7: CBP1 Installation")
+		LogMessage("CBP1 includes: 19 community maps")
+		
+		; Create temp directory for CBP1 download
+		Local $sCBP1Dir = $g_sTempDir & "\_CBP1"
+		If Not FileExists($sCBP1Dir) Then
+			DirCreate($sCBP1Dir)
+		EndIf
+		
+		; GitHub URLs for the 3-part split archive
+		Local $aPartURLs[3]
+		$aPartURLs[0] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/CBP1.z01"
+		$aPartURLs[1] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/CBP1.z02"
+		$aPartURLs[2] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/CBP1.zip"
+		
+		Local $aPartFiles[3]
+		$aPartFiles[0] = $sCBP1Dir & "\CBP1.z01"
+		$aPartFiles[1] = $sCBP1Dir & "\CBP1.z02"
+		$aPartFiles[2] = $sCBP1Dir & "\CBP1.zip"
+		
+		; Download all 3 parts
+		UpdateStatus("Downloading CBP1 (part 1 of 3)...")
+		LogMessage("Downloading CBP1 parts from GitHub")
+		
+		For $i = 0 To 2
+			Local $sPartName = "Part " & ($i + 1) & " of 3"
+			UpdateStatus("Downloading CBP1 (" & $sPartName & ")...")
+			LogMessage("Downloading: " & $aPartURLs[$i])
+			
+			Local $hDownload = InetGet($aPartURLs[$i], $aPartFiles[$i], $INET_FORCERELOAD, $INET_DOWNLOADBACKGROUND)
+			
+			While Not InetGetInfo($hDownload, $INET_DOWNLOADCOMPLETE)
+				Local $iBytesRead = InetGetInfo($hDownload, $INET_DOWNLOADREAD)
+				Local $iTotalSize = InetGetInfo($hDownload, $INET_DOWNLOADSIZE)
+				
+				If $iTotalSize > 0 Then
+					Local $sMB = Round($iBytesRead / 1048576, 1)
+					Local $sTotalMB = Round($iTotalSize / 1048576, 1)
+					GUICtrlSetData($g_idLabelStatus, "Downloading CBP1 " & $sPartName & ": " & $sMB & " MB / " & $sTotalMB & " MB")
+				EndIf
+				
+				Sleep(100)
+			WEnd
+			InetClose($hDownload)
+			
+			If Not FileExists($aPartFiles[$i]) Then
+				LogMessage("ERROR: Failed to download CBP1 " & $sPartName)
+				Return False
+			EndIf
+			
+			LogMessage($sPartName & " downloaded: " & FileGetSize($aPartFiles[$i]) & " bytes")
+		Next
+		
+		LogMessage("All 3 parts downloaded successfully")
+		GUICtrlSetData($g_idProgressBar, 96)
+		
+		; Extract CBP1
+		UpdateStatus("Extracting CBP1...")
+		LogMessage("Extracting CBP1 archive")
+		
+		Local $sCBP1Extracted = $sCBP1Dir & "\_Extracted"
+		Local $s7zCommand = '"' & $g_s7Zip & '" x "' & $aPartFiles[2] & '" -o"' & $sCBP1Extracted & '" -y'
+		LogMessage("Executing: " & $s7zCommand)
+		
+		Local $iExitCode = RunWait($s7zCommand, @ScriptDir, @SW_HIDE)
+		
+		If $iExitCode <> 0 Then
+			LogMessage("ERROR: CBP1 extraction failed with exit code: " & $iExitCode)
+			Return False
+		EndIf
+		
+		LogMessage("CBP1 extracted successfully")
+		GUICtrlSetData($g_idProgressBar, 97)
+		
+		; Copy CBP1 contents to game directory
+		UpdateStatus("Installing CBP1 files...")
+		LogMessage("Copying CBP1 files to: " & $g_sInstallPath)
+		
+		Local $sCBP1Source = $sCBP1Extracted
+		
+		If Not FileExists($sCBP1Source) Then
+			LogMessage("ERROR: CBP1 source folder not found: " & $sCBP1Source)
+			Return False
+		EndIf
+		
+		; Copy each folder
+		Local $aFolders[5] = ["Help", "Maps", "Music", "StaticMeshes", "Textures"]
+		
+		For $sFolder In $aFolders
+			Local $sSource = $sCBP1Source & "\" & $sFolder
+			Local $sDest = $g_sInstallPath & "\" & $sFolder
+			
+			If FileExists($sSource) Then
+				LogMessage("Copying: " & $sFolder)
+				DirCopy($sSource, $sDest, 1)
+				
+				If @error Then
+					LogMessage("WARNING: Error copying " & $sFolder)
+				Else
+					LogMessage($sFolder & " copied successfully")
+				EndIf
+			Else
+				LogMessage("WARNING: " & $sFolder & " not found in CBP1")
+			EndIf
+		Next
+		
+		LogMessage("CBP1 files copied to game directory")
+		GUICtrlSetData($g_idProgressBar, 98)
+		
+		; Verify installation
+		Local $bVerified = False
+		If FileExists($g_sInstallPath & "\Maps\DM-CBP1-Finale.ut2") And _
+		   FileExists($g_sInstallPath & "\Maps\CTF-CBP1-Concentrate.ut2") Then
+			$bVerified = True
+			LogMessage("CBP1 installation verified (maps found)")
+		Else
+			LogMessage("WARNING: CBP1 verification failed (maps not found)")
+		EndIf
+		
+		UpdateStatus("CBP1 installation complete")
+		LogMessage("Phase 7 complete")
+		
+		Return $bVerified
+	EndFunc
+	
+	Func Phase8_InstallCBP2V1()
+		; WHAT: Download and install Community Bonus Pack 2 Volume 1 (21 maps)
+		; WHY: User wants additional community maps
+		; HOW: Download 4-part ZIP from GitHub, extract with 7z, copy to game
+		;
+		; RETURN: True if successful, False if failed
+		
+		UpdateStatus("Installing Community Bonus Pack 2 Volume 1...")
+		LogMessage("Starting Phase 8: CBP2 Volume 1 Installation")
+		LogMessage("CBP2 Vol 1 includes: 21 community maps")
+		
+		; Create temp directory for CBP2V1 download
+		Local $sCBP2V1Dir = $g_sTempDir & "\_CBP2V1"
+		If Not FileExists($sCBP2V1Dir) Then
+			DirCreate($sCBP2V1Dir)
+		EndIf
+		
+		; GitHub URLs for the 4-part split archive
+		Local $aPartURLs[4]
+		$aPartURLs[0] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume1.z01"
+		$aPartURLs[1] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume1.z02"
+		$aPartURLs[2] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume1.z03"
+		$aPartURLs[3] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume1.zip"
+		
+		Local $aPartFiles[4]
+		$aPartFiles[0] = $sCBP2V1Dir & "\cbp2_volume1.z01"
+		$aPartFiles[1] = $sCBP2V1Dir & "\cbp2_volume1.z02"
+		$aPartFiles[2] = $sCBP2V1Dir & "\cbp2_volume1.z03"
+		$aPartFiles[3] = $sCBP2V1Dir & "\cbp2_volume1.zip"
+		
+		; Download all 4 parts
+		UpdateStatus("Downloading CBP2 Volume 1 (part 1 of 4)...")
+		LogMessage("Downloading CBP2 Volume 1 parts from GitHub")
+		
+		For $i = 0 To 3
+			Local $sPartName = "Part " & ($i + 1) & " of 4"
+			UpdateStatus("Downloading CBP2 Vol 1 (" & $sPartName & ")...")
+			LogMessage("Downloading: " & $aPartURLs[$i])
+			
+			Local $hDownload = InetGet($aPartURLs[$i], $aPartFiles[$i], $INET_FORCERELOAD, $INET_DOWNLOADBACKGROUND)
+			
+			While Not InetGetInfo($hDownload, $INET_DOWNLOADCOMPLETE)
+				Local $iBytesRead = InetGetInfo($hDownload, $INET_DOWNLOADREAD)
+				Local $iTotalSize = InetGetInfo($hDownload, $INET_DOWNLOADSIZE)
+				
+				If $iTotalSize > 0 Then
+					Local $sMB = Round($iBytesRead / 1048576, 1)
+					Local $sTotalMB = Round($iTotalSize / 1048576, 1)
+					GUICtrlSetData($g_idLabelStatus, "Downloading CBP2 Vol 1 " & $sPartName & ": " & $sMB & " MB / " & $sTotalMB & " MB")
+				EndIf
+				
+				Sleep(100)
+			WEnd
+			InetClose($hDownload)
+			
+			If Not FileExists($aPartFiles[$i]) Then
+				LogMessage("ERROR: Failed to download CBP2 Vol 1 " & $sPartName)
+				Return False
+			EndIf
+			
+			LogMessage($sPartName & " downloaded: " & FileGetSize($aPartFiles[$i]) & " bytes")
+		Next
+		
+		LogMessage("All 4 parts downloaded successfully")
+		GUICtrlSetData($g_idProgressBar, 96)
+		
+		; Extract CBP2 Vol 1
+		UpdateStatus("Extracting CBP2 Volume 1...")
+		LogMessage("Extracting CBP2 Volume 1 archive")
+		
+		Local $sCBP2V1Extracted = $sCBP2V1Dir & "\_Extracted"
+		Local $s7zCommand = '"' & $g_s7Zip & '" x "' & $aPartFiles[3] & '" -o"' & $sCBP2V1Extracted & '" -y'
+		LogMessage("Executing: " & $s7zCommand)
+		
+		Local $iExitCode = RunWait($s7zCommand, @ScriptDir, @SW_HIDE)
+		
+		If $iExitCode <> 0 Then
+			LogMessage("ERROR: CBP2 Volume 1 extraction failed with exit code: " & $iExitCode)
+			Return False
+		EndIf
+		
+		LogMessage("CBP2 Volume 1 extracted successfully")
+		GUICtrlSetData($g_idProgressBar, 97)
+		
+		; Copy CBP2 Vol 1 contents to game directory
+		UpdateStatus("Installing CBP2 Volume 1 files...")
+		LogMessage("Copying CBP2 Volume 1 files to: " & $g_sInstallPath)
+		
+		Local $sCBP2V1Source = $sCBP2V1Extracted
+		
+		If Not FileExists($sCBP2V1Source) Then
+			LogMessage("ERROR: CBP2 Volume 1 source folder not found: " & $sCBP2V1Source)
+			Return False
+		EndIf
+		
+		; Copy each folder
+		Local $aFolders[7] = ["Animations", "Help", "Maps", "Music", "StaticMeshes", "System", "Textures"]
+		
+		For $sFolder In $aFolders
+			Local $sSource = $sCBP2V1Source & "\" & $sFolder
+			Local $sDest = $g_sInstallPath & "\" & $sFolder
+			
+			If FileExists($sSource) Then
+				LogMessage("Copying: " & $sFolder)
+				DirCopy($sSource, $sDest, 1)
+				
+				If @error Then
+					LogMessage("WARNING: Error copying " & $sFolder)
+				Else
+					LogMessage($sFolder & " copied successfully")
+				EndIf
+			Else
+				LogMessage("WARNING: " & $sFolder & " not found in CBP2 Volume 1")
+			EndIf
+		Next
+		
+		LogMessage("CBP2 Volume 1 files copied to game directory")
+		GUICtrlSetData($g_idProgressBar, 98)
+		
+		; Verify installation
+		Local $bVerified = False
+		If FileExists($g_sInstallPath & "\Maps\AS-CBP2-Thrust.ut2") And _
+		   FileExists($g_sInstallPath & "\Maps\DM-CBP2-Achilles.ut2") Then
+			$bVerified = True
+			LogMessage("CBP2 Volume 1 installation verified (maps found)")
+		Else
+			LogMessage("WARNING: CBP2 Volume 1 verification failed (maps not found)")
+		EndIf
+		
+		UpdateStatus("CBP2 Volume 1 installation complete")
+		LogMessage("Phase 8 complete")
+		
+		Return $bVerified
+	EndFunc
+	
+	Func Phase9_InstallCBP2V2()
+		; WHAT: Download and install Community Bonus Pack 2 Volume 2 (20 maps)
+		; WHY: User wants additional community maps
+		; HOW: Download 4-part ZIP from GitHub, extract with 7z, copy to game
+		;
+		; RETURN: True if successful, False if failed
+		
+		UpdateStatus("Installing Community Bonus Pack 2 Volume 2...")
+		LogMessage("Starting Phase 9: CBP2 Volume 2 Installation")
+		LogMessage("CBP2 Vol 2 includes: 20 community maps")
+		
+		; Create temp directory for CBP2V2 download
+		Local $sCBP2V2Dir = $g_sTempDir & "\_CBP2V2"
+		If Not FileExists($sCBP2V2Dir) Then
+			DirCreate($sCBP2V2Dir)
+		EndIf
+		
+		; GitHub URLs for the 4-part split archive
+		Local $aPartURLs[4]
+		$aPartURLs[0] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume2.z01"
+		$aPartURLs[1] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume2.z02"
+		$aPartURLs[2] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume2.z03"
+		$aPartURLs[3] = "https://github.com/EddCase/UT2004-AIO-Installer/raw/main/BonusPacks/cbp2_volume2.zip"
+		
+		Local $aPartFiles[4]
+		$aPartFiles[0] = $sCBP2V2Dir & "\cbp2_volume2.z01"
+		$aPartFiles[1] = $sCBP2V2Dir & "\cbp2_volume2.z02"
+		$aPartFiles[2] = $sCBP2V2Dir & "\cbp2_volume2.z03"
+		$aPartFiles[3] = $sCBP2V2Dir & "\cbp2_volume2.zip"
+		
+		; Download all 4 parts
+		UpdateStatus("Downloading CBP2 Volume 2 (part 1 of 4)...")
+		LogMessage("Downloading CBP2 Volume 2 parts from GitHub")
+		
+		For $i = 0 To 3
+			Local $sPartName = "Part " & ($i + 1) & " of 4"
+			UpdateStatus("Downloading CBP2 Vol 2 (" & $sPartName & ")...")
+			LogMessage("Downloading: " & $aPartURLs[$i])
+			
+			Local $hDownload = InetGet($aPartURLs[$i], $aPartFiles[$i], $INET_FORCERELOAD, $INET_DOWNLOADBACKGROUND)
+			
+			While Not InetGetInfo($hDownload, $INET_DOWNLOADCOMPLETE)
+				Local $iBytesRead = InetGetInfo($hDownload, $INET_DOWNLOADREAD)
+				Local $iTotalSize = InetGetInfo($hDownload, $INET_DOWNLOADSIZE)
+				
+				If $iTotalSize > 0 Then
+					Local $sMB = Round($iBytesRead / 1048576, 1)
+					Local $sTotalMB = Round($iTotalSize / 1048576, 1)
+					GUICtrlSetData($g_idLabelStatus, "Downloading CBP2 Vol 2 " & $sPartName & ": " & $sMB & " MB / " & $sTotalMB & " MB")
+				EndIf
+				
+				Sleep(100)
+			WEnd
+			InetClose($hDownload)
+			
+			If Not FileExists($aPartFiles[$i]) Then
+				LogMessage("ERROR: Failed to download CBP2 Vol 2 " & $sPartName)
+				Return False
+			EndIf
+			
+			LogMessage($sPartName & " downloaded: " & FileGetSize($aPartFiles[$i]) & " bytes")
+		Next
+		
+		LogMessage("All 4 parts downloaded successfully")
+		GUICtrlSetData($g_idProgressBar, 96)
+		
+		; Extract CBP2 Vol 2
+		UpdateStatus("Extracting CBP2 Volume 2...")
+		LogMessage("Extracting CBP2 Volume 2 archive")
+		
+		Local $sCBP2V2Extracted = $sCBP2V2Dir & "\_Extracted"
+		Local $s7zCommand = '"' & $g_s7Zip & '" x "' & $aPartFiles[3] & '" -o"' & $sCBP2V2Extracted & '" -y'
+		LogMessage("Executing: " & $s7zCommand)
+		
+		Local $iExitCode = RunWait($s7zCommand, @ScriptDir, @SW_HIDE)
+		
+		If $iExitCode <> 0 Then
+			LogMessage("ERROR: CBP2 Volume 2 extraction failed with exit code: " & $iExitCode)
+			Return False
+		EndIf
+		
+		LogMessage("CBP2 Volume 2 extracted successfully")
+		GUICtrlSetData($g_idProgressBar, 97)
+		
+		; Copy CBP2 Vol 2 contents to game directory
+		UpdateStatus("Installing CBP2 Volume 2 files...")
+		LogMessage("Copying CBP2 Volume 2 files to: " & $g_sInstallPath)
+		
+		Local $sCBP2V2Source = $sCBP2V2Extracted
+		
+		If Not FileExists($sCBP2V2Source) Then
+			LogMessage("ERROR: CBP2 Volume 2 source folder not found: " & $sCBP2V2Source)
+			Return False
+		EndIf
+		
+		; Copy each folder
+		Local $aFolders[7] = ["Animations", "Help", "Maps", "Music", "StaticMeshes", "System", "Textures"]
+		
+		For $sFolder In $aFolders
+			Local $sSource = $sCBP2V2Source & "\" & $sFolder
+			Local $sDest = $g_sInstallPath & "\" & $sFolder
+			
+			If FileExists($sSource) Then
+				LogMessage("Copying: " & $sFolder)
+				DirCopy($sSource, $sDest, 1)
+				
+				If @error Then
+					LogMessage("WARNING: Error copying " & $sFolder)
+				Else
+					LogMessage($sFolder & " copied successfully")
+				EndIf
+			Else
+				LogMessage("WARNING: " & $sFolder & " not found in CBP2 Volume 2")
+			EndIf
+		Next
+		
+		LogMessage("CBP2 Volume 2 files copied to game directory")
+		GUICtrlSetData($g_idProgressBar, 98)
+		
+		; Verify installation
+		Local $bVerified = False
+		If FileExists($g_sInstallPath & "\Maps\BR-CBP2-Bahera.ut2") And _
+		   FileExists($g_sInstallPath & "\Maps\DM-CBP2-Buliwyf.ut2") Then
+			$bVerified = True
+			LogMessage("CBP2 Volume 2 installation verified (maps found)")
+		Else
+			LogMessage("WARNING: CBP2 Volume 2 verification failed (maps not found)")
+		EndIf
+		
+		UpdateStatus("CBP2 Volume 2 installation complete")
+		LogMessage("Phase 9 complete")
+		
+		Return $bVerified
 	EndFunc
 	
 	Func DownloadFileWithProgress($sURL, $sDestination, $iProgressStart, $iProgressEnd)
@@ -1770,7 +2359,7 @@
 		; WHAT: Log file header with version and timestamp
 		; WHY: Helps identify which installer version was used
 		; HOW: FileWriteLine writes a line to the file
-		LogMessage("UT2004 All-In-One Installer v0.5.0")
+		LogMessage("UT2004 All-In-One Installer v0.6.3")
 		LogMessage("Installation started: " & @YEAR & "-" & @MON & "-" & @MDAY & " " & @HOUR & ":" & @MIN & ":" & @SEC)
 		LogMessage("Installation Path: " & $g_sInstallPath)
 		LogMessage("=" & StringRepeat("=", 70))
@@ -1902,6 +2491,13 @@
 		GUICtrlSetState($g_idBtnInstall, $GUI_ENABLE)
 		GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_ENABLE)
 		GUICtrlSetState($g_idCheckboxFileAssoc, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxMegaPack, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxCBP1, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxCBP2V1, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxCBP2V2, $GUI_ENABLE)
+		GUICtrlSetState($g_idTabBtn1, $GUI_ENABLE)
+		GUICtrlSetState($g_idTabBtn2, $GUI_ENABLE)
+		GUICtrlSetState($g_idTabBtn3, $GUI_ENABLE)
 		
 		; Reset progress bar
 		GUICtrlSetData($g_idProgressBar, 0)
@@ -1939,9 +2535,470 @@
 		GUICtrlSetState($g_idBtnInstall, $GUI_ENABLE)
 		GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_ENABLE)
 		GUICtrlSetState($g_idCheckboxFileAssoc, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxMegaPack, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxCBP1, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxCBP2V1, $GUI_ENABLE)
+		GUICtrlSetState($g_idCheckboxCBP2V2, $GUI_ENABLE)
+		GUICtrlSetState($g_idTabBtn1, $GUI_ENABLE)
+		GUICtrlSetState($g_idTabBtn2, $GUI_ENABLE)
+		GUICtrlSetState($g_idTabBtn3, $GUI_ENABLE)
 		
 		; Reset progress bar
 		GUICtrlSetData($g_idProgressBar, 0)
 		UpdateStatus("Installation failed - see log for details")
+	EndFunc
+	
+	Func SwitchToTab($iTabNumber)
+		; WHAT: Switch between tabs in the GUI
+		; WHY: User clicks tab buttons to view different sections
+		; HOW: Hide current tab controls, show selected tab controls, update button styles
+		;
+		; PARAMETERS:
+		;   $iTabNumber - Which tab to show (1=Installation, 2=Official Content, 3=Options)
+		
+		; Don't switch if already on this tab
+		If $iTabNumber = $g_iCurrentTab Then Return
+		
+		; Hide current tab's controls
+		Switch $g_iCurrentTab
+			Case 1  ; Hide Installation tab
+				For $i = 0 To UBound($g_aTab1Controls) - 1
+					If $g_aTab1Controls[$i] <> 0 Then
+						GUICtrlSetState($g_aTab1Controls[$i], $GUI_HIDE)
+					EndIf
+				Next
+			Case 2  ; Hide Official Content tab
+				For $i = 0 To UBound($g_aTab2Controls) - 1
+					If $g_aTab2Controls[$i] <> 0 Then
+						GUICtrlSetState($g_aTab2Controls[$i], $GUI_HIDE)
+					EndIf
+				Next
+			Case 3  ; Hide Options tab
+				For $i = 0 To UBound($g_aTab3Controls) - 1
+					If $g_aTab3Controls[$i] <> 0 Then
+						GUICtrlSetState($g_aTab3Controls[$i], $GUI_HIDE)
+					EndIf
+				Next
+		EndSwitch
+		
+		; Show new tab's controls
+		Switch $iTabNumber
+			Case 1  ; Show Installation tab
+				For $i = 0 To UBound($g_aTab1Controls) - 1
+					If $g_aTab1Controls[$i] <> 0 Then
+						GUICtrlSetState($g_aTab1Controls[$i], $GUI_SHOW)
+					EndIf
+				Next
+				; Update tab button styles - Installation active
+				GUICtrlSetBkColor($g_idTabBtn1, $COLOR_UT_ORANGE)
+				GUICtrlSetColor($g_idTabBtn1, $COLOR_BG_DARK)
+				GUICtrlSetBkColor($g_idTabBtn2, $COLOR_BG_MID)
+				GUICtrlSetColor($g_idTabBtn2, $COLOR_TEXT)
+				GUICtrlSetBkColor($g_idTabBtn3, $COLOR_BG_MID)
+				GUICtrlSetColor($g_idTabBtn3, $COLOR_TEXT)
+				
+			Case 2  ; Show Official Content tab
+				For $i = 0 To UBound($g_aTab2Controls) - 1
+					If $g_aTab2Controls[$i] <> 0 Then
+						GUICtrlSetState($g_aTab2Controls[$i], $GUI_SHOW)
+					EndIf
+				Next
+				; Update tab button styles - Official Content active
+				GUICtrlSetBkColor($g_idTabBtn1, $COLOR_BG_MID)
+				GUICtrlSetColor($g_idTabBtn1, $COLOR_TEXT)
+				GUICtrlSetBkColor($g_idTabBtn2, $COLOR_UT_ORANGE)
+				GUICtrlSetColor($g_idTabBtn2, $COLOR_BG_DARK)
+				GUICtrlSetBkColor($g_idTabBtn3, $COLOR_BG_MID)
+				GUICtrlSetColor($g_idTabBtn3, $COLOR_TEXT)
+				
+			Case 3  ; Show Options tab
+				For $i = 0 To UBound($g_aTab3Controls) - 1
+					If $g_aTab3Controls[$i] <> 0 Then
+						GUICtrlSetState($g_aTab3Controls[$i], $GUI_SHOW)
+					EndIf
+				Next
+				; Update tab button styles - Options active
+				GUICtrlSetBkColor($g_idTabBtn1, $COLOR_BG_MID)
+				GUICtrlSetColor($g_idTabBtn1, $COLOR_TEXT)
+				GUICtrlSetBkColor($g_idTabBtn2, $COLOR_BG_MID)
+				GUICtrlSetColor($g_idTabBtn2, $COLOR_TEXT)
+				GUICtrlSetBkColor($g_idTabBtn3, $COLOR_UT_ORANGE)
+				GUICtrlSetColor($g_idTabBtn3, $COLOR_BG_DARK)
+		EndSwitch
+		
+		; Update current tab tracker
+		$g_iCurrentTab = $iTabNumber
+	EndFunc
+	
+	Func CreateTabButtons()
+		; WHAT: Create the three tab buttons at top of window
+		; WHY: User needs to click tabs to switch between sections
+		; HOW: Create buttons styled as tabs, first one active (orange)
+		
+		; Tab button dimensions
+		Local $iTabWidth = 200
+		Local $iTabHeight = 30
+		Local $iTabY = 20
+		
+		; Tab 1: Installation (active by default)
+		$g_idTabBtn1 = GUICtrlCreateButton("Installation", 20, $iTabY, $iTabWidth, $iTabHeight)
+		GUICtrlSetFont(-1, 10, 600)
+		GUICtrlSetBkColor(-1, $COLOR_UT_ORANGE)  ; Orange = active
+		GUICtrlSetColor(-1, $COLOR_BG_DARK)  ; Dark text on orange
+		
+		; Tab 2: Official Content (inactive)
+		$g_idTabBtn2 = GUICtrlCreateButton("Official Content", 225, $iTabY, $iTabWidth, $iTabHeight)
+		GUICtrlSetFont(-1, 10, 600)
+		GUICtrlSetBkColor(-1, $COLOR_BG_MID)  ; Medium gray = inactive
+		GUICtrlSetColor(-1, $COLOR_TEXT)  ; Normal text
+		
+		; Tab 3: Options (inactive)
+		$g_idTabBtn3 = GUICtrlCreateButton("Options", 430, $iTabY, $iTabWidth, $iTabHeight)
+		GUICtrlSetFont(-1, 10, 600)
+		GUICtrlSetBkColor(-1, $COLOR_BG_MID)  ; Medium gray = inactive
+		GUICtrlSetColor(-1, $COLOR_TEXT)  ; Normal text
+	EndFunc
+	
+	Func CreateTab1_Installation()
+		; WHAT: Create controls for Installation tab
+		; WHY: User needs to specify install path and CD key
+		; HOW: Create labels, inputs, button - store control IDs in array
+		;
+		; RETURN: Array of control IDs for this tab
+		
+		Local $aControls[12]  ; Array to store control IDs (increased size)
+		Local $iIdx = 0
+		
+		; Content starts at Y=60 (below tab buttons)
+		Local $iContentY = 60
+		
+		; Title Label - "UT2004 All-In-One Installer"
+		$aControls[$iIdx] = GUICtrlCreateLabel("UT2004 All-In-One Installer", 20, $iContentY + 5, 600, 30, $SS_CENTER)
+		GUICtrlSetFont(-1, 14, 800)
+		GUICtrlSetColor(-1, $COLOR_UT_ORANGE)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Version Label - small gray text below title
+		$aControls[$iIdx] = GUICtrlCreateLabel("v0.6.3", 20, $iContentY + 35, 600, 15, $SS_CENTER)
+		GUICtrlSetFont(-1, 8)
+		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Installation Path Label - moved down another 10px
+		$aControls[$iIdx] = GUICtrlCreateLabel("Installation Path:", 20, $iContentY + 80, 200, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Installation Path Input - extended to 490px
+		$g_idInputInstallPath = GUICtrlCreateInput($g_sInstallPath, 20, $iContentY + 105, 490, 25)
+		GUICtrlSetBkColor(-1, $COLOR_BG_MID)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		$aControls[$iIdx] = $g_idInputInstallPath
+		$iIdx += 1
+		
+		; Browse Button - moved to 520, BLUE!
+		$g_idBtnBrowse = GUICtrlCreateButton("Browse...", 520, $iContentY + 105, 100, 25)
+		GUICtrlSetBkColor(-1, $COLOR_UT_BLUE)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		$aControls[$iIdx] = $g_idBtnBrowse
+		$iIdx += 1
+		
+		; CD Key Label
+		$aControls[$iIdx] = GUICtrlCreateLabel("CD Key (Optional - for online server stats):", 20, $iContentY + 150, 400, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; CD Key Input with placeholder - extended to 600px (full width)
+		$g_idInputCDKey = GUICtrlCreateInput("", 20, $iContentY + 175, 600, 25)
+		GUICtrlSetBkColor(-1, $COLOR_BG_MID)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSendMsg(-1, 0x1501, True, "XXXXX-XXXXX-XXXXX-XXXXX")  ; EM_SETCUEBANNER - placeholder text
+		$aControls[$iIdx] = $g_idInputCDKey
+		$iIdx += 1
+		
+		; CD Key Hint - shortened
+		$aControls[$iIdx] = GUICtrlCreateLabel("(Leave blank if you don't have one)", 20, $iContentY + 205, 550, 20)
+		GUICtrlSetFont(-1, 8)
+		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Trim array to actual size
+		ReDim $aControls[$iIdx]
+		
+		Return $aControls
+	EndFunc
+	
+	Func CreateTab2_OfficialContent()
+		; WHAT: Create controls for Official Content tab
+		; WHY: User selects which bonus packs to install
+		; HOW: Create checkboxes for MegaPack and Community Bonus Packs
+		;
+		; RETURN: Array of control IDs for this tab
+		
+		Local $aControls[20]  ; Array to store control IDs
+		Local $iIdx = 0
+		
+		; Content starts at Y=60 (below tab buttons)
+		Local $iContentY = 80
+		Local $iSpacing = 30  ; Space between checkboxes
+		
+		; MegaPack checkbox
+		$g_idCheckboxMegaPack = GUICtrlCreateCheckbox("", 20, $iContentY, 20, 20)
+		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
+		$aControls[$iIdx] = $g_idCheckboxMegaPack
+		$iIdx += 1
+		
+		; MegaPack label
+		$g_idLabelMegaPack = GUICtrlCreateLabel("Install MegaPack (ECE content + 9 bonus maps) - ~190 MB download", 45, $iContentY + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$aControls[$iIdx] = $g_idLabelMegaPack
+		$iIdx += 1
+		RegisterLabelCheckboxPair($g_idLabelMegaPack, $g_idCheckboxMegaPack)
+		
+		; Community Bonus Pack 1 checkbox
+		$g_idCheckboxCBP1 = GUICtrlCreateCheckbox("", 20, $iContentY + $iSpacing, 20, 20)
+		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
+		$aControls[$iIdx] = $g_idCheckboxCBP1
+		$iIdx += 1
+		
+		; CBP1 label
+		$g_idLabelCBP1 = GUICtrlCreateLabel("Community Bonus Pack 1 (19 maps) - ~138 MB download", 45, $iContentY + $iSpacing + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$aControls[$iIdx] = $g_idLabelCBP1
+		$iIdx += 1
+		RegisterLabelCheckboxPair($g_idLabelCBP1, $g_idCheckboxCBP1)
+		
+		; Community Bonus Pack 2 Vol 1 checkbox
+		$g_idCheckboxCBP2V1 = GUICtrlCreateCheckbox("", 20, $iContentY + ($iSpacing * 2), 20, 20)
+		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
+		$aControls[$iIdx] = $g_idCheckboxCBP2V1
+		$iIdx += 1
+		
+		; CBP2 Vol 1 label
+		$g_idLabelCBP2V1 = GUICtrlCreateLabel("Community Bonus Pack 2 Volume 1 (21 maps) - ~195 MB download", 45, $iContentY + ($iSpacing * 2) + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$aControls[$iIdx] = $g_idLabelCBP2V1
+		$iIdx += 1
+		RegisterLabelCheckboxPair($g_idLabelCBP2V1, $g_idCheckboxCBP2V1)
+		
+		; Community Bonus Pack 2 Vol 2 checkbox
+		$g_idCheckboxCBP2V2 = GUICtrlCreateCheckbox("", 20, $iContentY + ($iSpacing * 3), 20, 20)
+		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
+		$aControls[$iIdx] = $g_idCheckboxCBP2V2
+		$iIdx += 1
+		
+		; CBP2 Vol 2 label
+		$g_idLabelCBP2V2 = GUICtrlCreateLabel("Community Bonus Pack 2 Volume 2 (20 maps) - ~192 MB download", 45, $iContentY + ($iSpacing * 3) + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$aControls[$iIdx] = $g_idLabelCBP2V2
+		$iIdx += 1
+		RegisterLabelCheckboxPair($g_idLabelCBP2V2, $g_idCheckboxCBP2V2)
+		
+		; Hide all controls initially (Tab 2 not active by default)
+		For $i = 0 To $iIdx - 1
+			GUICtrlSetState($aControls[$i], $GUI_HIDE)
+		Next
+		
+		; Trim array to actual size
+		ReDim $aControls[$iIdx]
+		
+		Return $aControls
+	EndFunc
+	
+	Func CreateTab3_Options()
+		; WHAT: Create controls for Options tab
+		; WHY: User selects installer options and game configuration
+		; HOW: Create checkboxes for active options + disabled placeholders for future features
+		;
+		; RETURN: Array of control IDs for this tab
+		
+		Local $aControls[20]  ; Array to store control IDs
+		Local $iIdx = 0
+		
+		; Content starts at Y=80 (below tab buttons)
+		Local $iContentY = 80
+		Local $iSpacing = 30  ; Space between checkboxes
+		
+		; Keep installer files checkbox
+		$g_idCheckboxKeepFiles = GUICtrlCreateCheckbox("", 20, $iContentY, 20, 20)
+		GUICtrlSetState(-1, $GUI_UNCHECKED)  ; Unchecked by default
+		$aControls[$iIdx] = $g_idCheckboxKeepFiles
+		$iIdx += 1
+		
+		; Keep files label
+		$g_idLabelKeepFiles = GUICtrlCreateLabel("Keep installer files (ISO and patch for future use)", 45, $iContentY + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$aControls[$iIdx] = $g_idLabelKeepFiles
+		$iIdx += 1
+		RegisterLabelCheckboxPair($g_idLabelKeepFiles, $g_idCheckboxKeepFiles)
+		
+		; Register file associations checkbox
+		$g_idCheckboxFileAssoc = GUICtrlCreateCheckbox("", 20, $iContentY + $iSpacing, 20, 20)
+		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
+		$aControls[$iIdx] = $g_idCheckboxFileAssoc
+		$iIdx += 1
+		
+		; File associations label
+		$g_idLabelFileAssoc = GUICtrlCreateLabel("Register file associations (ut2004:// protocol and .ut4mod files)", 45, $iContentY + $iSpacing + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$aControls[$iIdx] = $g_idLabelFileAssoc
+		$iIdx += 1
+		RegisterLabelCheckboxPair($g_idLabelFileAssoc, $g_idCheckboxFileAssoc)
+		
+		; === PLACEHOLDER OPTIONS (Disabled - Coming Soon) ===
+		
+		; Configure default resolution checkbox (disabled)
+		$aControls[$iIdx] = GUICtrlCreateCheckbox("", 20, $iContentY + ($iSpacing * 2), 20, 20)
+		GUICtrlSetState(-1, $GUI_UNCHECKED)
+		GUICtrlSetState(-1, $GUI_DISABLE)
+		$iIdx += 1
+		
+		; Resolution label
+		$aControls[$iIdx] = GUICtrlCreateLabel("Configure default resolution - Coming Soon", 45, $iContentY + ($iSpacing * 2) + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Configure refresh rate checkbox (disabled)
+		$aControls[$iIdx] = GUICtrlCreateCheckbox("", 20, $iContentY + ($iSpacing * 3), 20, 20)
+		GUICtrlSetState(-1, $GUI_UNCHECKED)
+		GUICtrlSetState(-1, $GUI_DISABLE)
+		$iIdx += 1
+		
+		; Refresh rate label
+		$aControls[$iIdx] = GUICtrlCreateLabel("Configure refresh rate - Coming Soon", 45, $iContentY + ($iSpacing * 3) + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Pre-configure game settings checkbox (disabled)
+		$aControls[$iIdx] = GUICtrlCreateCheckbox("", 20, $iContentY + ($iSpacing * 4), 20, 20)
+		GUICtrlSetState(-1, $GUI_UNCHECKED)
+		GUICtrlSetState(-1, $GUI_DISABLE)
+		$iIdx += 1
+		
+		; Game settings label
+		$aControls[$iIdx] = GUICtrlCreateLabel("Pre-configure game settings (graphics, controls, etc.) - Coming Soon", 45, $iContentY + ($iSpacing * 4) + 2, 570, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		$iIdx += 1
+		
+		; Hide all controls initially (Tab 3 not active by default)
+		For $i = 0 To $iIdx - 1
+			GUICtrlSetState($aControls[$i], $GUI_HIDE)
+		Next
+		
+		; Trim array to actual size
+		ReDim $aControls[$iIdx]
+		
+		Return $aControls
+	EndFunc
+	
+	Func CopyBonusPackParts($sSourceDir, $sDestDir, $sBaseName, $iPartCount)
+		; WHAT: Copy bonus pack split archive files to Installer folder
+		; WHY: User wants to keep installer files for future use
+		; HOW: Copy .z01, .z02, etc. and .zip files if they exist
+		;
+		; PARAMETERS:
+		;   $sSourceDir  - Source directory containing the files
+		;   $sDestDir    - Destination directory
+		;   $sBaseName   - Base filename (e.g., "CBP1", "cbp2_volume1")
+		;   $iPartCount  - Number of parts (3 or 4)
+		
+		If Not FileExists($sSourceDir) Then Return
+		
+		; Copy .z01, .z02, .z03 (if applicable)
+		For $i = 1 To $iPartCount - 1
+			Local $sPartNum = StringFormat("%02d", $i)
+			Local $sSourceFile = $sSourceDir & "\" & $sBaseName & ".z" & $sPartNum
+			
+			If FileExists($sSourceFile) Then
+				FileCopy($sSourceFile, $sDestDir & "\" & $sBaseName & ".z" & $sPartNum, 1)
+				LogMessage("Copied: " & $sBaseName & ".z" & $sPartNum)
+			EndIf
+		Next
+		
+		; Copy final .zip file
+		Local $sZipSource = $sSourceDir & "\" & $sBaseName & ".zip"
+		If FileExists($sZipSource) Then
+			FileCopy($sZipSource, $sDestDir & "\" & $sBaseName & ".zip", 1)
+			LogMessage("Copied: " & $sBaseName & ".zip")
+		EndIf
+	EndFunc
+	
+	Func LoadSettings()
+		; WHAT: Load user preferences from INI file
+		; WHY: Convenience for repeat users (especially testers)
+		; HOW: Read installer_settings.ini from script directory
+		;
+		; INI File Format:
+		; [Options]
+		; KeepFiles=1
+		; CleanTemp=0
+		; [Installation]
+		; CDKey=XXXXX-XXXXX-XXXXX-XXXXX
+		
+		Local $sINIFile = @ScriptDir & "\installer_settings.ini"
+		
+		; Check if settings file exists
+		If Not FileExists($sINIFile) Then
+			Return  ; No settings to load
+		EndIf
+		
+		; Load CD Key
+		Local $sCDKey = IniRead($sINIFile, "Installation", "CDKey", "")
+		If $sCDKey <> "" Then
+			GUICtrlSetData($g_idInputCDKey, $sCDKey)
+		EndIf
+		
+		; Load Keep Files setting
+		Local $iKeepFiles = IniRead($sINIFile, "Options", "KeepFiles", "0")
+		If $iKeepFiles = "1" Then
+			GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_CHECKED)
+		Else
+			GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_UNCHECKED)
+		EndIf
+		
+		; Load Clean Temp setting (inverse logic - save means DON'T clean)
+		Local $iCleanTemp = IniRead($sINIFile, "Options", "CleanTemp", "1")
+		If $iCleanTemp = "0" Then
+			; User wants to keep temp files
+			GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_CHECKED)  ; Check "Keep Files" to prevent cleanup
+		EndIf
+		
+		LogMessage("Loaded settings from: " & $sINIFile)
+	EndFunc
+	
+	Func SaveSettings()
+		; WHAT: Save current checkbox states to INI file
+		; WHY: Remember user preferences for next run
+		; HOW: Write to installer_settings.ini in script directory
+		
+		Local $sINIFile = @ScriptDir & "\installer_settings.ini"
+		
+		; Save CD Key (if provided)
+		Local $sCDKey = StringStripWS(GUICtrlRead($g_idInputCDKey), 3)
+		IniWrite($sINIFile, "Installation", "CDKey", $sCDKey)
+		
+		; Save Keep Files setting
+		Local $bKeepFiles = (GUICtrlRead($g_idCheckboxKeepFiles) = $GUI_CHECKED)
+		IniWrite($sINIFile, "Options", "KeepFiles", $bKeepFiles ? "1" : "0")
+		
+		; Note: CleanTemp is controlled by KeepFiles checkbox behavior
+		; If KeepFiles is checked, temp is kept; if unchecked, temp is cleaned
+		IniWrite($sINIFile, "Options", "CleanTemp", $bKeepFiles ? "0" : "1")
+		
+		LogMessage("Saved settings to: " & $sINIFile)
 	EndFunc
 #EndRegion

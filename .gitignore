@@ -1,95 +1,46 @@
-# UT2004-AIO-Installer .gitignore
+# ========================================
+# UT2004 Installer - .gitignore
+# ========================================
 
-# ==============================================================================
-# CONVENTION: Underscore prefix = temporary/local (DON'T commit)
-#             No underscore = part of project (DO commit)
-# ==============================================================================
-
-# ==============================================================================
-# Personal Automation Scripts (local only)
-# ==============================================================================
-_*.bat
-_*.cmd
-local_*.bat
-local_*.cmd
-
-# ==============================================================================
-# Runtime Folders (generated at runtime, don't commit)
-# ==============================================================================
-_Downloads/
-_Temp/
-_Temp_CABs/
-_ISO/
-ISO_Extracted/
-UT2004_Temp/
-
-# ==============================================================================
-# Downloaded Files (cache, don't commit)
-# ==============================================================================
-*.iso
-
-# ==============================================================================
-# Installation Testing (local only)
-# ==============================================================================
-UT2004_Test/
-test_installs/
-
-# ==============================================================================
-# Compiled Executables (generated from .au3 source)
-# ==============================================================================
+# Compiled executables (don't commit - too large)
 *.exe
-*.a3x
 
-# ==============================================================================
-# Bulk Downloads from Claude
-# ==============================================================================
+# Old versions (archived locally)
+*_v0.3.*.au3
+*_v0.4.*.au3
+*_v0.5.*.au3
+*_v0.6.0.au3
+*_v0.6.1.au3
+
+# Archive folder
+_Old/
+
+# Temporary files
+*.tmp
+*.bak
+DIR.txt
 files.zip
 
-# ==============================================================================
-# Claude's Internal Folders
-# ==============================================================================
-mnt/
+# AutoIt compiled files
+*.a3x
 
-# ==============================================================================
-# Windows System Files
-# ==============================================================================
+# Windows system files
 Thumbs.db
-Desktop.ini
-$RECYCLE.BIN/
+desktop.ini
 *.lnk
 
-# ==============================================================================
-# Editor/IDE Files
-# ==============================================================================
+# Editor files
 .vscode/
-.idea/
 *.sublime-*
-*.code-workspace
 
-# ==============================================================================
-# Logs and Temp Files
-# ==============================================================================
-*.log
-*.tmp
-*.temp
-~*
+# Research/planning docs (keep in _Old)
+*_RESEARCH.md
+*_COMPLETE.md
+*_CODE.txt
+*_STRATEGY.md
+*_PLAN.md
+FIXES_*.md
 
-# ==============================================================================
-# KEEP THESE FILES (part of project - NO underscore prefix)
-# ==============================================================================
-# Tools folder (bundled with installer)
-!Tools/
-!Tools/*.exe
-!Tools/*.dll
-
-# License files
-!Licenses/
-!Licenses/*.txt
-
-# Source files
-!*.au3
-!*.md
-
-# Documentation
-!docs/
-
+# One-time use scripts
+repack_bonus_packs.bat
+cleanup_project*.bat
