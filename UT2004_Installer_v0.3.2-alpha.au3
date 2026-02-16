@@ -2,17 +2,17 @@
 
 	AutoIt Version: 3.3.16.1
 	Author:         EddCase
-	Version:        0.3.0-alpha
+	Version:        0.3.2-alpha
 	
 	Script Function:
 		UT2004 All-In-One Installer
 		Custom installation with full control over the process
 		
-	Phase 1: GUI with UT2004 Theme (CURRENT)
-	Phase 2: ISO Download
-	Phase 3: ISO Extraction
-	Phase 4: CAB Extraction
-	Phase 5: Patch & Finalize
+	Phase 1: GUI with UT2004 Theme (COMPLETE)
+	Phase 2: ISO Download (COMPLETE)
+	Phase 3: ISO Extraction (COMPLETE)
+	Phase 4: CAB Extraction (COMPLETE)
+	Phase 5: Copy Files & Finalize (CURRENT)
 
 #ce ----------------------------------------------------------------------------
 
@@ -81,6 +81,7 @@
 	
 	Global $g_hGUI                  ; Main window handle
 	Global $g_idInputInstallPath    ; Installation path text box
+	Global $g_idInputCDKey          ; CD Key input (optional)
 	Global $g_idBtnBrowse           ; Browse button
 	Global $g_idBtnInstall          ; Install button
 	Global $g_idProgressBar         ; Progress bar
@@ -232,7 +233,7 @@
 		;   - -1, -1: Center on screen
 		;   - $WS_CAPTION + $WS_SYSMENU: Title bar with close button, no resize
 		;   - $WS_EX_TOPMOST: Keep window on top (optional, can remove)
-		$g_hGUI = GUICreate("Unreal Tournament 2004 - Community Installer", 600, 400, -1, -1, _
+		$g_hGUI = GUICreate("Unreal Tournament 2004 - Community Installer", 600, 480, -1, -1, _
 				BitOR($WS_CAPTION, $WS_SYSMENU))
 		
 		; WHAT: Set window background color
@@ -287,18 +288,45 @@
 		GUICtrlSetColor(-1, $COLOR_TEXT)
 		GUICtrlSetBkColor(-1, $COLOR_UT_BLUE)  ; Blue button
 		
+		; CD Key Section (Optional)
+		; WHAT: Label for CD key input
+		; WHY: Optional - allows users to add CD key for server stats
+		; HOW: Label positioned below installation path
+		Local $idLabelCDKey = GUICtrlCreateLabel("CD Key (Optional - for online server stats):", 20, 175, 560, 20)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		
+		; CD Key input box
+		; WHAT: Text box for optional CD key
+		; WHY: Servers track stats by CD key
+		; HOW: Input control with placeholder hint
+		;   - Format: XXXXX-XXXXX-XXXXX-XXXXX (validated on install)
+		$g_idInputCDKey = GUICtrlCreateInput("", 20, 200, 470, 25)
+		GUICtrlSetColor(-1, $COLOR_TEXT)
+		GUICtrlSetBkColor(-1, $COLOR_BG_MID)
+		GUICtrlSendMsg(-1, 0x1501, True, "XXXXX-XXXXX-XXXXX-XXXXX")  ; EM_SETCUEBANNER - placeholder text
+		
+		; CD Key hint
+		; WHAT: Explain CD key is optional
+		; WHY: User should know they can skip it
+		; HOW: Dimmed text as a hint
+		Local $idLabelCDKeyHint = GUICtrlCreateLabel("(Leave blank if you don't have one - not required for single player)", 40, 230, 540, 20)
+		GUICtrlSetFont(-1, 8)
+		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
+		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
+		
 		; Options Section
 		; WHAT: Checkbox for keeping installer files (without text)
 		; WHY: AutoIt checkboxes don't support text coloring, so we use a separate label
 		; HOW: Create checkbox without text, then label next to it
-		$g_idCheckboxKeepFiles = GUICtrlCreateCheckbox("", 20, 180, 20, 20)
+		$g_idCheckboxKeepFiles = GUICtrlCreateCheckbox("", 20, 260, 20, 20)
 		GUICtrlSetState(-1, $GUI_CHECKED)  ; Checked by default
 		
 		; Label for checkbox (clickable to toggle checkbox)
 		; WHAT: Themed label next to checkbox
 		; WHY: We can color this label, unlike checkbox text
 		; HOW: Position it right after the checkbox, register in mapping system
-		$g_idLabelKeepFiles = GUICtrlCreateLabel("Keep installer files in game directory (~2.8 GB)", 45, 182, 535, 20)
+		$g_idLabelKeepFiles = GUICtrlCreateLabel("Keep installer files in game directory (~2.8 GB)", 45, 262, 535, 20)
 		GUICtrlSetColor(-1, $COLOR_TEXT)
 		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
 		
@@ -312,7 +340,7 @@
 		; WHAT: Explain what "keep files" means
 		; WHY: User should know what they're keeping
 		; HOW: Dimmed text as a hint/note
-		Local $idLabelKeepInfo = GUICtrlCreateLabel("(Saves ISO and patch for future use)", 40, 205, 540, 20)
+		Local $idLabelKeepInfo = GUICtrlCreateLabel("(Saves ISO and patch for future use)", 40, 285, 540, 20)
 		GUICtrlSetFont(-1, 8)
 		GUICtrlSetColor(-1, $COLOR_TEXT_DIM)
 		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
@@ -322,14 +350,14 @@
 		; WHY: User needs to see installation is working
 		; HOW: Progress bar control, initially at 0%
 		;   - PBS_SMOOTH: Smooth progress (not chunky blocks)
-		$g_idProgressBar = GUICtrlCreateProgress(20, 250, 560, 25)
+		$g_idProgressBar = GUICtrlCreateProgress(20, 330, 560, 25)
 		GUICtrlSetColor(-1, $COLOR_UT_ORANGE)  ; Orange progress bar
 		
 		; Status Label
 		; WHAT: Text description of current step
 		; WHY: User should know what's happening
 		; HOW: Label below progress bar, will be updated during installation
-		$g_idLabelStatus = GUICtrlCreateLabel("Ready to install", 20, 285, 560, 20, $SS_CENTER)
+		$g_idLabelStatus = GUICtrlCreateLabel("Ready to install", 20, 365, 560, 20, $SS_CENTER)
 		GUICtrlSetColor(-1, $COLOR_TEXT)
 		GUICtrlSetBkColor(-1, $GUI_BKCOLOR_TRANSPARENT)
 		
@@ -338,7 +366,7 @@
 		; WHY: Primary action of the installer
 		; HOW: Large, centered button with orange background
 		;   - Height: 40 (bigger than other buttons)
-		$g_idBtnInstall = GUICtrlCreateButton("Install UT2004", 200, 330, 200, 40)
+		$g_idBtnInstall = GUICtrlCreateButton("Install UT2004", 200, 410, 200, 40)
 		GUICtrlSetFont(-1, 12, 600)  ; 12pt, semi-bold
 		GUICtrlSetColor(-1, $COLOR_BG_DARK)  ; Dark text on orange
 		GUICtrlSetBkColor(-1, $COLOR_UT_ORANGE)  ; Orange button
@@ -469,6 +497,27 @@
 		; HOW: GUICtrlRead gets text from input control
 		$g_sInstallPath = GUICtrlRead($g_idInputInstallPath)
 		
+		; Get CD Key if provided
+		; WHAT: Read optional CD key from input box
+		; WHY: User may have entered a key for server stats
+		; HOW: GUICtrlRead gets text, validate format
+		Local $sCDKey = StringStripWS(GUICtrlRead($g_idInputCDKey), 3)  ; Remove leading/trailing spaces
+		
+		; Validate CD Key format if provided
+		If $sCDKey <> "" Then
+			If Not ValidateCDKey($sCDKey) Then
+				MsgBox(48, "Invalid CD Key", "CD Key must be in format: XXXXX-XXXXX-XXXXX-XXXXX" & @CRLF & _
+						"(5 groups of 5 alphanumeric characters separated by hyphens)" & @CRLF & @CRLF & _
+						"Leave blank if you don't have a key.")
+				Return
+			EndIf
+			; Convert to uppercase for consistency
+			$sCDKey = StringUpper($sCDKey)
+			LogMessage("CD Key provided: " & $sCDKey)
+		Else
+			LogMessage("No CD Key provided (optional)")
+		EndIf
+		
 		; Validate install path
 		; WHAT: Make sure the path is valid
 		; WHY: Can't install to invalid or inaccessible location
@@ -493,9 +542,10 @@
 		
 		; Disable UI during installation
 		; WHAT: Prevent user from changing things mid-install
-		; WHY: Changing paths during installation would cause problems
+		; WHY: Changing paths/keys during installation would cause problems
 		; HOW: Disable input, browse, and install buttons
 		GUICtrlSetState($g_idInputInstallPath, $GUI_DISABLE)
+		GUICtrlSetState($g_idInputCDKey, $GUI_DISABLE)
 		GUICtrlSetState($g_idBtnBrowse, $GUI_DISABLE)
 		GUICtrlSetState($g_idBtnInstall, $GUI_DISABLE)
 		GUICtrlSetState($g_idCheckboxKeepFiles, $GUI_DISABLE)
@@ -543,7 +593,7 @@
 		; Phase 3: Extract CAB files from ISO
 		; WHAT: Extract CAB files from ISO
 		; WHY: Need CABs to extract game files
-		; HOW: Use 7za.exe to extract, flatten structure
+		; HOW: Use 7z.exe to extract, flatten structure
 		If Not Phase3_ExtractISO() Then
 			; Extraction failed
 			UpdateStatus("Installation failed: Could not extract ISO")
@@ -551,8 +601,30 @@
 			Return False
 		EndIf
 		
-		; Phase 4: Extract CABs (to be implemented)
-		UpdateStatus("Phase 4 (CAB extraction) will be implemented next")
+		; Phase 4: Extract game files from CABs
+		; WHAT: Extract game files from CAB files using unshield
+		; WHY: Need actual game files to install
+		; HOW: Run unshield on each CAB, extract to temp
+		If Not Phase4_ExtractCABs() Then
+			; Extraction failed
+			UpdateStatus("Installation failed: Could not extract CAB files")
+			InstallationFailed("Failed to extract game files from CAB files")
+			Return False
+		EndIf
+		
+		; Phase 5: Copy files to installation directory
+		; WHAT: Copy extracted files to user's install location
+		; WHY: Move files from temp to final location
+		; HOW: Copy and rename folders according to mapping
+		If Not Phase5_CopyFiles() Then
+			; Copy failed
+			UpdateStatus("Installation failed: Could not copy files")
+			InstallationFailed("Failed to copy game files to installation directory")
+			Return False
+		EndIf
+		
+		; Temporary: Mark as complete
+		UpdateStatus("Installation complete (patching will be added in Phase 5b)")
 		Sleep(2000)
 		
 		; Temporary: Mark as complete for testing
@@ -725,19 +797,20 @@
 		LogMessage("Created CAB output directory: " & $sCABOutputDir)
 		
 		; Build 7z command
-		; WHAT: Construct command to extract only CAB files
-		; WHY: We only need CABs, not setup.exe, autorun, etc.
-		; HOW: 7z.exe e (extract without paths) *.cab -r (recursive) -y (yes to all)
+		; WHAT: Construct command to extract CAB and HDR files
+		; WHY: We need both - HDR files are headers for InstallShield CAB groups
+		; HOW: 7z.exe e (extract without paths) with multiple file patterns
 		;
 		; COMMAND BREAKDOWN:
 		;   e           = Extract without directory structure (flatten)
 		;   "ISO"       = Source ISO file (in quotes for spaces)
 		;   -o"output"  = Output directory (no space between -o and path!)
-		;   *.cab       = Only extract CAB files
+		;   *.cab       = Extract CAB files
+		;   *.hdr       = Extract HDR (header) files - needed for InstallShield CABs!
 		;   -r          = Recursive (search all folders in ISO)
 		;   -y          = Yes to all prompts (non-interactive)
 		
-		Local $s7zCommand = '"' & $g_s7Zip & '" e "' & $sISOPath & '" -o"' & $sCABOutputDir & '" *.cab -r -y'
+		Local $s7zCommand = '"' & $g_s7Zip & '" e "' & $sISOPath & '" -o"' & $sCABOutputDir & '" *.cab *.hdr -r -y'
 		
 		LogMessage("Executing: " & $s7zCommand)
 		UpdateStatus("Extracting CAB files (this may take a minute)...")
@@ -795,6 +868,282 @@
 		
 		Return True
 	EndFunc
+	
+	Func Phase4_ExtractCABs()
+		; WHAT: Extract game files from CAB files
+		; WHY: CABs contain the actual game files we need
+		; HOW: Use unshield.exe to extract each CAB to temp directory
+		;
+		; RETURN: True if extraction successful, False if failed
+		
+		UpdateStatus("Preparing to extract game files...")
+		LogMessage("Starting CAB extraction (Phase 4)")
+		
+		; Define paths
+		Local $sCABDir = $g_sTempCABs
+		Local $sExtractDir = $g_sTempDir & "\_Temp_Extracted"
+		
+		; Create extraction directory
+		; WHAT: Make folder to store extracted game files
+		; WHY: Need somewhere to put the files
+		; HOW: DirCreate (clean if exists)
+		If FileExists($sExtractDir) Then
+			DirRemove($sExtractDir, 1)  ; Clean existing
+			LogMessage("Cleaned existing extraction directory")
+		EndIf
+		DirCreate($sExtractDir)
+		LogMessage("Created extraction directory: " & $sExtractDir)
+		
+		; Get list of CAB files
+		; WHAT: Find all CAB files to extract
+		; WHY: Need to process each one
+		; HOW: _FileListToArray gets all *.cab files
+		Local $aCABs = _FileListToArray($sCABDir, "*.cab", $FLTA_FILES)
+		
+		If @error Or $aCABs[0] = 0 Then
+			UpdateStatus("Error: No CAB files found")
+			LogMessage("ERROR: No CAB files in: " & $sCABDir)
+			Return False
+		EndIf
+		
+		LogMessage("Found " & $aCABs[0] & " CAB files to extract")
+		
+		; Find the HDR file
+		; WHAT: Look for data1.hdr (InstallShield header file)
+		; WHY: unshield needs the HDR file to extract the CAB group
+		; HOW: Check if data1.hdr exists
+		Local $sHDRFile = $sCABDir & "\data1.hdr"
+		
+		If Not FileExists($sHDRFile) Then
+			UpdateStatus("Error: data1.hdr not found")
+			LogMessage("ERROR: InstallShield header file not found: " & $sHDRFile)
+			LogMessage("NOTE: InstallShield CABs require the .hdr file to extract")
+			Return False
+		EndIf
+		
+		LogMessage("Found InstallShield header: data1.hdr")
+		
+		; Update progress to 60% (start of CAB extraction)
+		GUICtrlSetData($g_idProgressBar, 60)
+		
+		; Extract the InstallShield cabinet group
+		; WHAT: Use unshield to extract all CABs in the group
+		; WHY: InstallShield CABs work as a group, not individually
+		; HOW: Run unshield with the HDR file - it will extract all related CABs
+		
+		UpdateStatus("Extracting game files from InstallShield cabinets...")
+		LogMessage("Extracting InstallShield cabinet group")
+		
+		; Build unshield command
+		; WHAT: Construct command to extract InstallShield cabinet group
+		; WHY: unshield uses the HDR file to know about all CABs in the group
+		; HOW: unshield x "data1.hdr" -d "outputdir"
+		;
+		; COMMAND BREAKDOWN:
+		;   x             = Extract mode
+		;   "data1.hdr"   = Header file (describes the cabinet group)
+		;   -d "dir"      = Destination directory
+		
+		Local $sUnshieldCommand = '"' & $g_sUnshield & '" x "' & $sHDRFile & '" -d "' & $sExtractDir & '"'
+		
+		LogMessage("Executing: " & $sUnshieldCommand)
+		
+		; Run unshield
+		; WHAT: Execute unshield to extract all CABs
+		; WHY: Get all the game files
+		; HOW: RunWait executes and returns exit code
+		Local $iExitCode = RunWait($sUnshieldCommand, @ScriptDir, @SW_HIDE)
+		
+		If $iExitCode <> 0 Then
+			LogMessage("WARNING: unshield returned exit code: " & $iExitCode)
+			; Continue anyway - unshield often returns non-zero even on success
+		EndIf
+		
+		; Update progress to 70% (extraction in progress)
+		GUICtrlSetData($g_idProgressBar, 70)
+		
+		; Verify extraction
+		; WHAT: Make sure we got some files
+		; WHY: Extraction might fail silently
+		; HOW: Check if extraction directory has subdirectories
+		Local $aDirs = _FileListToArray($sExtractDir, "*", $FLTA_FOLDERS)
+		
+		If @error Or $aDirs[0] = 0 Then
+			UpdateStatus("Error: No files extracted from CABs")
+			LogMessage("ERROR: Extraction directory is empty: " & $sExtractDir)
+			Return False
+		EndIf
+		
+		; Success!
+		UpdateStatus("Extracted " & $aCABs[0] & " CAB files successfully")
+		LogMessage("CAB extraction complete. Found " & $aDirs[0] & " directories in extraction folder")
+		
+		; Log directory structure
+		LogMessage("Extracted directories:")
+		For $i = 1 To $aDirs[0]
+			LogMessage("  - " & $aDirs[$i], True)
+		Next
+		
+		; Update progress to 75% (CAB extraction complete)
+		GUICtrlSetData($g_idProgressBar, 75)
+		
+		Return True
+	EndFunc
+	
+	Func Phase5_CopyFiles()
+		; WHAT: Copy extracted game files to installation directory
+		; WHY: Move files from temp extraction to final install location
+		; HOW: Copy folders with proper naming, skip unwanted folders
+		;
+		; RETURN: True if copy successful, False if failed
+		
+		UpdateStatus("Copying game files to installation directory...")
+		LogMessage("Starting file copy (Phase 5)")
+		
+		; Define paths
+		Local $sExtractDir = $g_sTempDir & "\_Temp_Extracted"
+		Local $sInstallDir = $g_sInstallPath
+		
+		; Update progress to 75% (start of copy)
+		GUICtrlSetData($g_idProgressBar, 75)
+		
+		; Copy All_* folders (simple rename)
+		; WHAT: Copy folders that start with "All_"
+		; WHY: These contain main game files
+		; HOW: Loop through, remove "All_" prefix, copy
+		Local $aFolders = _FileListToArray($sExtractDir, "All_*", $FLTA_FOLDERS)
+		
+		If Not @error And $aFolders[0] > 0 Then
+			LogMessage("Copying " & $aFolders[0] & " 'All_*' folders")
+			
+			For $i = 1 To $aFolders[0]
+				Local $sSrcFolder = $sExtractDir & "\" & $aFolders[$i]
+				Local $sDestName = StringReplace($aFolders[$i], "All_", "")  ; Remove "All_" prefix
+				
+				; Special handling for All_UT2004.EXE → System
+				If $aFolders[$i] = "All_UT2004.EXE" Then
+					$sDestName = "System"
+				EndIf
+				
+				Local $sDestFolder = $sInstallDir & "\" & $sDestName
+				
+				UpdateStatus("Copying " & $sDestName & "...")
+				LogMessage("Copying: " & $aFolders[$i] & " → " & $sDestName)
+				
+				; Copy folder
+				If Not DirCopy($sSrcFolder, $sDestFolder, 1) Then  ; 1 = overwrite
+					LogMessage("ERROR: Failed to copy " & $aFolders[$i])
+					Return False
+				EndIf
+			Next
+		EndIf
+		
+		; Update progress to 80%
+		GUICtrlSetData($g_idProgressBar, 80)
+		
+		; Copy English_Manual → Manual
+		UpdateStatus("Copying manual...")
+		If FileExists($sExtractDir & "\English_Manual") Then
+			LogMessage("Copying: English_Manual → Manual")
+			If Not DirCopy($sExtractDir & "\English_Manual", $sInstallDir & "\Manual", 1) Then
+				LogMessage("WARNING: Failed to copy Manual")
+			EndIf
+		EndIf
+		
+		; Update progress to 82%
+		GUICtrlSetData($g_idProgressBar, 82)
+		
+		; Handle English_Sounds_Speech_System_Help (complex merge)
+		; WHAT: Copy subfolders to different locations
+		; WHY: This folder contains files for Help, Sounds, Speech, and System
+		; HOW: Copy each subfolder separately
+		Local $sEnglishBase = $sExtractDir & "\English_Sounds_Speech_System_Help"
+		
+		If FileExists($sEnglishBase) Then
+			LogMessage("Processing English_Sounds_Speech_System_Help folder")
+			
+			; Copy Help subfolder (merge with existing Help)
+			If FileExists($sEnglishBase & "\Help") Then
+				UpdateStatus("Copying Help files...")
+				LogMessage("Copying: English_...\Help → Help (merge)")
+				FileCopy($sEnglishBase & "\Help\*.*", $sInstallDir & "\Help\", 1)  ; 1 = overwrite
+			EndIf
+			
+			; Copy Sounds subfolder (new folder)
+			If FileExists($sEnglishBase & "\Sounds") Then
+				UpdateStatus("Copying Sounds...")
+				LogMessage("Copying: English_...\Sounds → Sounds")
+				DirCopy($sEnglishBase & "\Sounds", $sInstallDir & "\Sounds", 1)
+			EndIf
+			
+			; Copy Speech subfolder (new folder)
+			If FileExists($sEnglishBase & "\Speech") Then
+				UpdateStatus("Copying Speech...")
+				LogMessage("Copying: English_...\Speech → Speech")
+				DirCopy($sEnglishBase & "\Speech", $sInstallDir & "\Speech", 1)
+			EndIf
+			
+			; Copy System subfolder (merge with existing System)
+			If FileExists($sEnglishBase & "\System") Then
+				UpdateStatus("Copying System files...")
+				LogMessage("Copying: English_...\System → System (merge)")
+				FileCopy($sEnglishBase & "\System\*.*", $sInstallDir & "\System\", 1)
+				
+				; Copy System\editorres subfolder if exists
+				If FileExists($sEnglishBase & "\System\editorres") Then
+					LogMessage("Copying: System\editorres subfolder")
+					DirCopy($sEnglishBase & "\System\editorres", $sInstallDir & "\System\editorres", 1)
+				EndIf
+			EndIf
+		EndIf
+		
+		; Update progress to 85%
+		GUICtrlSetData($g_idProgressBar, 85)
+		
+		; Verify critical files exist
+		; WHAT: Make sure essential game files were copied
+		; WHY: Installation is useless without these
+		; HOW: Check for UT2004.exe and other critical files
+		UpdateStatus("Verifying installation...")
+		LogMessage("Verifying critical files")
+		
+		Local $bValid = True
+		
+		If Not FileExists($sInstallDir & "\System\UT2004.exe") Then
+			LogMessage("ERROR: UT2004.exe not found!")
+			$bValid = False
+		EndIf
+		
+		If Not FileExists($sInstallDir & "\System\Core.dll") Then
+			LogMessage("WARNING: Core.dll not found")
+		EndIf
+		
+		If Not FileExists($sInstallDir & "\System\Engine.dll") Then
+			LogMessage("WARNING: Engine.dll not found")
+		EndIf
+		
+		; Check for at least some map files
+		Local $aMaps = _FileListToArray($sInstallDir & "\Maps", "*.ut2", $FLTA_FILES)
+		If @error Or $aMaps[0] = 0 Then
+			LogMessage("WARNING: No map files found")
+		Else
+			LogMessage("Found " & $aMaps[0] & " map files")
+		EndIf
+		
+		If Not $bValid Then
+			UpdateStatus("Installation verification failed")
+			Return False
+		EndIf
+		
+		; Update progress to 90%
+		GUICtrlSetData($g_idProgressBar, 90)
+		
+		UpdateStatus("Files copied successfully")
+		LogMessage("File copy complete - all game files installed")
+		
+		Return True
+	EndFunc
+	
 	Func DownloadFileWithProgress($sURL, $sDestination, $iProgressStart, $iProgressEnd)
 		; WHAT: Download a file with progress bar updates
 		; WHY: User needs to see download progress
@@ -953,6 +1302,35 @@
 		Return $sResult
 	EndFunc
 	
+	Func ValidateCDKey($sKey)
+		; WHAT: Validate CD key format
+		; WHY: Ensure key is in correct format before writing to registry
+		; HOW: Check for XXXXX-XXXXX-XXXXX-XXXXX pattern (alphanumeric, 5 groups of 5)
+		;
+		; PARAMETERS:
+		;   $sKey - CD key to validate
+		;
+		; RETURN: True if valid or empty (optional), False if invalid format
+		
+		; Empty is valid (CD key is optional)
+		If $sKey = "" Then Return True
+		
+		; Check pattern: 5 chars, hyphen, 5 chars, hyphen, 5 chars, hyphen, 5 chars
+		; WHAT: Use regex to validate format
+		; WHY: CD keys must be exactly 5-5-5-5 format
+		; HOW: ^[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$
+		Local $sPattern = "^[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$"
+		
+		; Convert to uppercase for validation
+		$sKey = StringUpper($sKey)
+		
+		If StringRegExp($sKey, $sPattern) Then
+			Return True
+		Else
+			Return False
+		EndIf
+	EndFunc
+	
 	Func InitializeLog()
 		; WHAT: Create and open the installation log file
 		; WHY: Track installation progress for troubleshooting
@@ -986,7 +1364,7 @@
 		; WHAT: Log file header with version and timestamp
 		; WHY: Helps identify which installer version was used
 		; HOW: FileWriteLine writes a line to the file
-		LogMessage("UT2004 All-In-One Installer v0.3.0-alpha")
+		LogMessage("UT2004 All-In-One Installer v0.3.2-alpha")
 		LogMessage("Installation started: " & @YEAR & "-" & @MON & "-" & @MDAY & " " & @HOUR & ":" & @MIN & ":" & @SEC)
 		LogMessage("Installation Path: " & $g_sInstallPath)
 		LogMessage("=" & StringRepeat("=", 70))

@@ -1,0 +1,153 @@
+# Phase 5b Code - Add after Phase5_CopyFiles (line 1158)
+
+```autoit
+	Func Phase5b_PatchAndRegistry()
+		; WHAT: Apply OldUnreal patch and write registry entries
+		; WHY: Game needs latest patch and registry integration
+		; HOW: Download patch from GitHub, extract, write full registry set
+		;
+		; RETURN: True if successful, False if failed
+		
+		UpdateStatus("Applying OldUnreal patch...")
+		LogMessage("Starting Phase 5b: Patch and Registry")
+		
+		; Update progress to 90%
+		GUICtrlSetData($g_idProgressBar, 90)
+		
+		; Step 1: Query GitHub for latest patch
+		UpdateStatus("Checking for latest OldUnreal patch...")
+		LogMessage("Querying GitHub API for latest patch")
+		
+		Local $sAPIUrl = "https://api.github.com/repos/OldUnreal/UT2004Patches/releases/latest"
+		Local $sAPIResponse = InetRead($sAPIUrl, $INET_FORCERELOAD)
+		
+		If @error Then
+			LogMessage("ERROR: Failed to query GitHub API")
+			Return False
+		EndIf
+		
+		; Convert binary response to string
+		Local $sJSON = BinaryToString($sAPIResponse)
+		
+		; Parse JSON to find Windows patch
+		; WHAT: Extract download URL for Windows patch
+		; WHY: Need the correct platform-specific patch
+		; HOW: Find asset with "Windows" and ".zip" in name
+		Local $sDownloadURL = ""
+		Local $sPatchVersion = ""
+		
+		; Extract tag_name (version)
+		Local $aVersion = StringRegExp($sJSON, '"tag_name"\s*:\s*"([^"]+)"', 1)
+		If Not @error And UBound($aVersion) > 0 Then
+			$sPatchVersion = $aVersion[0]
+			LogMessage("Latest patch version: " & $sPatchVersion)
+		EndIf
+		
+		; Find Windows patch download URL
+		Local $aAssets = StringRegExp($sJSON, '"browser_download_url"\s*:\s*"([^"]+Windows[^"]+\.zip)"', 3)
+		If Not @error And UBound($aAssets) > 0 Then
+			$sDownloadURL = $aAssets[0]
+			LogMessage("Windows patch URL: " & $sDownloadURL)
+		Else
+			LogMessage("ERROR: Could not find Windows patch in release")
+			Return False
+		EndIf
+		
+		; Step 2: Download patch
+		Local $sPatchFile = $g_sDownloadDir & "\OldUnreal-Patch.zip"
+		UpdateStatus("Downloading OldUnreal patch...")
+		LogMessage("Downloading patch to: " & $sPatchFile)
+		
+		; Use InetGet to download (90% → 92%)
+		Local $hDownload = InetGet($sDownloadURL, $sPatchFile, $INET_FORCERELOAD, $INET_DOWNLOADBACKGROUND)
+		
+		; Wait for download
+		While Not InetGetInfo($hDownload, $INET_DOWNLOADCOMPLETE)
+			Sleep(100)
+		WEnd
+		InetClose($hDownload)
+		
+		If Not FileExists($sPatchFile) Then
+			LogMessage("ERROR: Patch download failed")
+			Return False
+		EndIf
+		
+		LogMessage("Patch downloaded: " & FileGetSize($sPatchFile) & " bytes")
+		GUICtrlSetData($g_idProgressBar, 92)
+		
+		; Step 3: Extract patch to install directory
+		UpdateStatus("Extracting patch...")
+		LogMessage("Extracting patch to: " & $g_sInstallPath)
+		
+		Local $s7zCommand = '"' & $g_s7Zip & '" x "' & $sPatchFile & '" -o"' & $g_sInstallPath & '" -y'
+		LogMessage("Executing: " & $s7zCommand)
+		
+		Local $iExitCode = RunWait($s7zCommand, @ScriptDir, @SW_HIDE)
+		
+		If $iExitCode <> 0 Then
+			LogMessage("ERROR: Patch extraction failed with exit code: " & $iExitCode)
+			Return False
+		EndIf
+		
+		LogMessage("Patch extracted successfully")
+		GUICtrlSetData($g_idProgressBar, 94)
+		
+		; Step 4: Write registry entries
+		UpdateStatus("Writing registry entries...")
+		LogMessage("Writing registry entries")
+		
+		; WHAT: Write full registry set for maximum compatibility
+		; WHY: Some tools/mods might check these values
+		; HOW: Write all 9 values like official installer
+		
+		Local $sRegKey = "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Unreal Technology\Installed Apps\UT2004"
+		
+		; Required - Install folder
+		RegWrite($sRegKey, "Folder", "REG_SZ", $g_sInstallPath)
+		LogMessage("Registry: Folder = " & $g_sInstallPath)
+		
+		; Optional - CD Key (blank if not provided)
+		RegWrite($sRegKey, "CDKey", "REG_SZ", $g_sCDKey)
+		If $g_sCDKey <> "" Then
+			LogMessage("Registry: CDKey = " & $g_sCDKey)
+		Else
+			LogMessage("Registry: CDKey = (blank)")
+		EndIf
+		
+		; Compatibility values (same as official installer)
+		RegWrite($sRegKey, "Version", "REG_SZ", "3369")
+		RegWrite($sRegKey, "YEAR", "REG_SZ", "2004")
+		RegWrite($sRegKey, "TITLEBAR", "REG_SZ", "Unreal Tournament 2004")
+		RegWrite($sRegKey, "ADMIN_RIGHTS", "REG_SZ", "You need to run this program as an administrator, not as a guest or limited user account.")
+		RegWrite($sRegKey, "NO_DISC", "REG_SZ", "No disc in drive.  Please insert the disc labelled Unreal Tournament 2004 Play Disc to continue.")
+		RegWrite($sRegKey, "NO_DRIVE", "REG_SZ", "No CD-ROM or DVD-ROM drive detected.")
+		RegWrite($sRegKey, "WRONG_DISC", "REG_SZ", "Wrong disc in drive.  Please insert the disc labelled Unreal Tournament 2004 Play Disc to continue.")
+		
+		LogMessage("Registry: All compatibility values written")
+		
+		; Step 5: Create uninstall entry
+		UpdateStatus("Creating uninstall entry...")
+		LogMessage("Creating uninstall entry")
+		
+		Local $sUninstallKey = "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\UT2004_Community"
+		
+		RegWrite($sUninstallKey, "DisplayName", "REG_SZ", "Unreal Tournament 2004")
+		RegWrite($sUninstallKey, "DisplayVersion", "REG_SZ", $sPatchVersion)
+		RegWrite($sUninstallKey, "Publisher", "REG_SZ", "Epic Games / Community Installer")
+		RegWrite($sUninstallKey, "DisplayIcon", "REG_SZ", $g_sInstallPath & "\System\UT2004.exe")
+		RegWrite($sUninstallKey, "InstallLocation", "REG_SZ", $g_sInstallPath)
+		RegWrite($sUninstallKey, "NoModify", "REG_DWORD", 1)
+		RegWrite($sUninstallKey, "NoRepair", "REG_DWORD", 1)
+		; UninstallString will be added when we create uninstaller in v1.1
+		
+		LogMessage("Uninstall entry created")
+		GUICtrlSetData($g_idProgressBar, 95)
+		
+		UpdateStatus("Patch and registry complete")
+		LogMessage("Phase 5b complete")
+		
+		Return True
+	EndFunc
+```
+
+## Add this between line 1158 (End of Phase5) and line 1160 (Start of DownloadFileWithProgress)

@@ -90,16 +90,14 @@ UT2004-AIO-Installer/
 ├── .gitignore                          - Git ignore rules
 │
 ├── Tools/                              - Bundled tools (FileInstall)
-│   ├── 7za.exe                          - 7-Zip console
-│   ├── 7za.dll                          - 7-Zip library
+│   ├── 7z.exe                          - 7-Zip console (1.4 MB)
+│   ├── 7z.dll                          - 7-Zip library
 │   ├── unshield.exe                    - CAB extractor
 │   └── zlib1.dll                       - unshield dependency
 │
 ├── Licenses/                           - Required licenses
-│   ├── 7-Zip License.txt
-│   └── AutoIt License.txt
-│   └── Epic Games TOS.txt
-│   └── Unshield License.txt
+│   ├── 7zip-LICENSE.txt
+│   └── unshield-LICENSE.txt
 │
 └── docs/                               - Documentation
     ├── INSTALLATION_PROCESS.md         - How installation works
