@@ -2,9 +2,19 @@
 
 A modern, automated installer for **Unreal Tournament 2004** with support for all official bonus content, built with AutoIt.
 
-![Version](https://img.shields.io/badge/version-0.6.3-orange)
+![Version](https://img.shields.io/badge/version-0.6.6-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+
+## 📸 Screenshots
+
+| Installation | Official Content |
+|:---:|:---:|
+| ![Installation Tab](Images/tab_installation.png) | ![Official Content Tab](Images/tab_content.png) |
+
+| Options | Installing |
+|:---:|:---:|
+| ![Options Tab](Images/tab_options.png) | ![Installing](Images/installing.png) |
 
 ## 🎮 Features
 
@@ -14,7 +24,8 @@ A modern, automated installer for **Unreal Tournament 2004** with support for al
 - ✅ **OldUnreal Patch** - Auto-downloads and applies latest community patch
 - ✅ **Full Registry Support** - Complete compatibility settings
 - ✅ **File Associations** - Registers `ut2004://` protocol and `.ut4mod` files
-- ✅ **Desktop & Start Menu Shortcuts**
+- ✅ **Shortcuts** - Desktop, Start Menu (game, editor, manual) and install root shortcuts
+- ✅ **Windows Firewall Rules** - Automatic exception for online play
 
 ### Bonus Content (Optional)
 All bonus packs can be selected individually:
@@ -34,12 +45,12 @@ All bonus packs can be selected individually:
 - 🎨 **UT2004-Themed Interface** - Dark theme with signature orange accents
 - 📑 **Tabbed Layout** - Clean organization (Installation / Official Content / Options)
 - 📊 **Progress Tracking** - Real-time status updates
-- 💾 **Keep Installer Files** - Optional archival of downloaded files
+- 💾 **Portable Download Cache** - Keep downloaded files next to installer for reuse
 - 🗑️ **Professional Uninstaller** - Complete removal with user settings option
 
 ## 📥 Download
 
-**Latest Release:** [v0.6.3](https://github.com/EddCase/UT2004-AIO-Installer/releases/latest)
+**Latest Release:** [v0.6.6](https://github.com/EddCase/UT2004-AIO-Installer/releases/latest)
 
 Simply download `UT2004_Installer.exe` and run - no other files needed!
 
@@ -67,7 +78,7 @@ Simply download `UT2004_Installer.exe` and run - no other files needed!
 **Option 2 - Build from Source:**
 1. Download source code from GitHub
 2. Install [AutoIt](https://www.autoitscript.com/)
-3. Compile `UT2004_Installer_v0.6.3.au3` yourself
+3. Compile `UT2004_Installer_v0.6.6.au3` yourself
 4. You'll see exactly what the installer does!
 
 **Note:** This is a common issue with AutoIt-compiled programs. The installer performs no malicious actions - it only installs UT2004 and community patches.
@@ -97,7 +108,13 @@ Simply download `UT2004_Installer.exe` and run - no other files needed!
 ### Default Install
 - **Game Files:** `C:\Program Files\UT2004`
 - **User Settings:** `My Documents\My Games\UT2004`
-- **Temp Files:** `%TEMP%\UT2004_Install` (cleaned after install unless "Keep files" checked)
+- **Temp Files:** `%TEMP%\UT2004_Install` (install.log kept, working files cleaned after install)
+- **Download Cache:** Next to installer in `_Downloads\` (if "Keep installer files" checked)
+
+### Shortcuts Created
+- **Desktop:** `UT2004.lnk`
+- **Start Menu:** `Unreal Tournament 2004\` folder containing `UT2004.lnk`, `UnrealEd.lnk`, `Manual.lnk`
+- **Install Root:** `UT2004.lnk`, `UnrealEd.lnk`
 
 ### Registry Entries
 - `HKLM\SOFTWARE\Unreal Technology\Installed Apps\UT2004`
@@ -114,20 +131,21 @@ The uninstaller removes:
 - ✅ Registry entries
 - ✅ File associations
 - ✅ Shortcuts
+- ✅ Firewall rules
 - ⚙️ Optional: Keep user settings/saved games
 - ⚙️ Optional: Clean temporary installer files
 
 ## 🛠️ Technical Details
 
 ### Installation Process
-1. **Phase 1:** Setup (create directories, initialize logging)
-2. **Phase 2:** Download UT2004 ISO (~2.8 GB)
-3. **Phase 3:** Extract ISO with 7-Zip
-4. **Phase 4:** Extract CAB files with unshield
-5. **Phase 5:** Copy files to installation directory
-6. **Phase 5c:** Create shortcuts and cleanup
-7. **Phase 6-9:** Install selected bonus packs (optional)
-8. **Phase 5b:** Apply OldUnreal patch (always last!)
+1. **Phase 2:** Download UT2004 ISO (~2.8 GB)
+2. **Phase 3:** Extract ISO with 7-Zip
+3. **Phase 4:** Extract CAB files with unshield
+4. **Phase 5:** Copy files to installation directory
+5. **Phase 5c:** Create shortcuts
+6. **Phase 6-9:** Install selected bonus packs (optional)
+7. **Phase 5b:** Apply OldUnreal patch (always last!)
+8. **Phase Finalise:** Move/clean download cache and temp files
 
 ### Bundled Tools
 - **7-Zip** v24.08 (LGPL) - ISO and archive extraction
@@ -137,6 +155,30 @@ The uninstaller removes:
 All tools are embedded in the installer and extracted to temp directory during installation.
 
 ## 📝 Changelog
+
+### v0.6.6 (2026-02-17)
+**New Features:**
+- UnrealEd shortcut in install root and Start Menu
+- Manual shortcut in Start Menu
+- Portable download cache - all bonus pack archives now correctly moved next to installer when "Keep installer files" is checked
+- Smart temp cleanup - large extracted folders deleted after install, install.log always preserved
+
+**Bug Fixes:**
+- Fixed bonus pack archives not being moved to portable cache (was running before downloads completed)
+- Fixed broken FileCopy fallback that only copied top-level files
+- Fixed stale v0.6.4 version strings showing in title bar and Options tab
+
+**Improvements:**
+- Global version constant - single change needed for future version bumps
+- Phase_Finalise() - cleanup now runs after all downloads complete
+- Phase5c renamed to Phase5c_Shortcuts() - cleaner separation of concerns
+
+### v0.6.5 (2026-02-17)
+**New Features:**
+- Windows Firewall rules for online play
+- INI settings persistence (installer_settings.ini)
+- Portable _Downloads cache (moved next to exe when Keep Files checked)
+- Bonus Pack download caching (skip re-download if already kept)
 
 ### v0.6.1 (2026-02-16)
 **Bug Fixes:**
@@ -152,19 +194,12 @@ All tools are embedded in the installer and extracted to temp directory during i
 - Uninstaller options: keep settings, clean temp files
 - Registry UninstallString properly configured
 
-**Improvements:**
-- "Keep Files" now saves all bonus pack archives
-- Better file organization
-
 ### v0.5.3 (2026-02-16)
 **New Features:**
 - Community Bonus Pack 1 (19 maps)
 - Community Bonus Pack 2 Volume 1 (21 maps)
 - Community Bonus Pack 2 Volume 2 (20 maps)
 - All bonus packs fully implemented and tested
-
-**Bug Fixes:**
-- Fixed CBP2V2 verification using correct map names
 
 [Full Changelog](CHANGELOG.md)
 

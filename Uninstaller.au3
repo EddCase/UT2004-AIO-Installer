@@ -4,8 +4,8 @@
 #AutoIt3Wrapper_UseX64=n
 #AutoIt3Wrapper_Res_Comment=UT2004 Uninstaller
 #AutoIt3Wrapper_Res_Description=UT2004 Uninstaller
-#AutoIt3Wrapper_Res_Fileversion=0.6.3.0
-#AutoIt3Wrapper_Res_ProductVersion=0.6.3
+#AutoIt3Wrapper_Res_Fileversion=0.6.4.0
+#AutoIt3Wrapper_Res_ProductVersion=0.6.4
 #AutoIt3Wrapper_Res_CompanyName=Community Project
 #AutoIt3Wrapper_Res_LegalCopyright=MIT License
 #AutoIt3Wrapper_Res_Language=1033
@@ -17,7 +17,7 @@
 ;
 ;	AutoIt Version: 3.3.16.1
 ;	Author:         EddCase
-;	Version:        0.6.3
+;	Version:        0.6.4
 ;	
 ;	Script Function:
 ;		Uninstall Unreal Tournament 2004
@@ -291,7 +291,11 @@ Func PerformUninstall($sInstallPath, $bCleanTemp, $bKeepSettings)
 	ProgressSet(50, "Removing file associations...")
 	RemoveFileAssociations()
 	
-	; Step 4: Delete shortcuts
+	; Step 4: Remove firewall rules
+	ProgressSet(60, "Removing firewall rules...")
+	RemoveFirewallRules()
+	
+	; Step 5: Delete shortcuts
 	ProgressSet(70, "Deleting shortcuts...")
 	DeleteShortcuts()
 	
@@ -350,6 +354,14 @@ Func RemoveFileAssociations()
 	; Remove .ut4mod file association
 	RegDelete("HKEY_LOCAL_MACHINE\SOFTWARE\Classes\.ut4mod")
 	RegDelete("HKEY_LOCAL_MACHINE\SOFTWARE\Classes\UT2004.Mod")
+EndFunc
+
+Func RemoveFirewallRules()
+	; WHAT: Remove Windows Firewall rules created by installer
+	; WHY: Clean uninstall
+	; HOW: Use netsh to delete rules by name
+	
+	RunWait('netsh advfirewall firewall delete rule name="Unreal Tournament 2004"', @SystemDir, @SW_HIDE)
 EndFunc
 
 Func DeleteShortcuts()
