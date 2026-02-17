@@ -12,6 +12,9 @@
 *_v0.6.0.au3
 *_v0.6.1.au3
 
+# Downloads folder (Downloaded During Install - too large)
+_Downloads
+
 # Archive folder
 _Old/
 
@@ -42,5 +45,7 @@ desktop.ini
 FIXES_*.md
 
 # One-time use scripts
-repack_bonus_packs.bat
-cleanup_project*.bat
+*.bat
+
+#Runtime Files
+installer_settings.ini
