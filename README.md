@@ -2,7 +2,7 @@
 
 A modern, automated installer for **Unreal Tournament 2004** with support for all official bonus content, built with AutoIt.
 
-![Version](https://img.shields.io/badge/version-0.6.6-orange)
+![Version](https://img.shields.io/badge/version-0.6.7-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 
@@ -50,7 +50,7 @@ All bonus packs can be selected individually:
 
 ## 📥 Download
 
-**Latest Release:** [v0.6.6](https://github.com/EddCase/UT2004-AIO-Installer/releases/latest)
+**Latest Release:** [v0.6.7](https://github.com/EddCase/UT2004-AIO-Installer/releases/latest)
 
 Simply download `UT2004_Installer.exe` and run - no other files needed!
 
@@ -78,7 +78,7 @@ Simply download `UT2004_Installer.exe` and run - no other files needed!
 **Option 2 - Build from Source:**
 1. Download source code from GitHub
 2. Install [AutoIt](https://www.autoitscript.com/)
-3. Compile `UT2004_Installer_v0.6.6.au3` yourself
+3. Compile `UT2004_Installer_v0.6.7.au3` yourself
 4. You'll see exactly what the installer does!
 
 **Note:** This is a common issue with AutoIt-compiled programs. The installer performs no malicious actions - it only installs UT2004 and community patches.
@@ -145,7 +145,8 @@ The uninstaller removes:
 5. **Phase 5c:** Create shortcuts
 6. **Phase 6-9:** Install selected bonus packs (optional)
 7. **Phase 5b:** Apply OldUnreal patch (always last!)
-8. **Phase Finalise:** Move/clean download cache and temp files
+8. **Phase ConfigureGame:** Apply resolution and detail settings to UT2004.ini
+9. **Phase Finalise:** Move/clean download cache and temp files
 
 ### Bundled Tools
 - **7-Zip** v24.08 (LGPL) - ISO and archive extraction
@@ -155,6 +156,13 @@ The uninstaller removes:
 All tools are embedded in the installer and extracted to temp directory during installation.
 
 ## 📝 Changelog
+
+### v0.6.7 (2026-02-18)
+**New Features:**
+- Auto-detect monitor resolution and refresh rate via WMI
+- Set Holy S**t! (Maximum detail settings) option
+- FirstRun protection for max detail settings using detected patch version
+- Resolution and detail settings applied before first game launch
 
 ### v0.6.6 (2026-02-17)
 **New Features:**
