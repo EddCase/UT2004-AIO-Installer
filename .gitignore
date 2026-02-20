@@ -1,52 +1,78 @@
 # ========================================
 # UT2004 Installer - .gitignore
 # ========================================
+# Strategy: exclude EVERYTHING by default, then explicitly allow
+# only the files we want in the repo. This means nothing sneaks
+# in by accident.
+# ========================================
 
-# Compiled executables (don't commit - too large)
+# Exclude everything
+*
+
+# ========================================
+# EXPLICITLY ALLOWED FILES
+# ========================================
+
+# This gitignore file itself
+!.gitignore
+
+# Latest installer source
+!UT2004_Installer_v0.6.8.au3
+
+# Uninstaller source
+!Uninstaller.au3
+
+# Example settings file (template - not the live one)
+!installer_settings_EXAMPLE.ini
+
+# README
+!README.md
+
+# ========================================
+# EXPLICITLY ALLOWED FOLDERS AND CONTENTS
+# ========================================
+
+# Tools folder (bundled executables and dlls)
+!Tools/
+!Tools/*
+
+# Images folder (screenshots for README)
+!Images/
+!Images/*
+
+# ========================================
+# ALWAYS EXCLUDED (even if matched above)
+# ========================================
+
+# Live settings file - contains CD key, custom URLs, user prefs
+installer_settings.ini
+
+# Downloaded game files - far too large
+_Downloads/
+
+# Compiled executable - attached to GitHub release manually
 *.exe
-
-# But ALLOW Tools exe files (bundled with installer, must be in repo)
+# But allow Tools exes
 !Tools/*.exe
 
-# Au3 source files (exclude all, allow specific versions)
-*.au3
-!Uninstaller.au3
-!UT2004_Installer_v0.6.6.au3
-
-# Downloads folder (Downloaded During Install - too large)
-_Downloads
-
-# Archive folder
-_Old/
-
-# Temporary files
+# Temp and working files
 *.tmp
 *.bak
+*.a3x
+*.lnk
 DIR.txt
 files.zip
 
-# AutoIt compiled files
-*.a3x
+# Old versions and working docs
+_Old/
+*_HANDOVER.txt
+*_STATUS.txt
+*_TESTING_PLAN.md
 
-# Windows system files
+# Windows
 Thumbs.db
 desktop.ini
-*.lnk
 
-# Editor files
+# Editor
 .vscode/
 *.sublime-*
-
-# Research/planning docs (keep in _Old)
-*_RESEARCH.md
-*_COMPLETE.md
-*_CODE.txt
-*_STRATEGY.md
-*_PLAN.md
-FIXES_*.md
-
-# One-time use scripts
-*.bat
-
-# Runtime Files
-installer_settings.ini

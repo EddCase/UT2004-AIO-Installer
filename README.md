@@ -2,7 +2,7 @@
 
 A modern, automated installer for **Unreal Tournament 2004** with support for all official bonus content, built with AutoIt.
 
-![Version](https://img.shields.io/badge/version-0.6.7-orange)
+![Version](https://img.shields.io/badge/version-0.6.8-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 
@@ -50,7 +50,7 @@ All bonus packs can be selected individually:
 
 ## 📥 Download
 
-**Latest Release:** [v0.6.7](https://github.com/EddCase/UT2004-AIO-Installer/releases/latest)
+**Latest Release:** [v0.6.8](https://github.com/EddCase/UT2004-AIO-Installer/releases/latest)
 
 Simply download `UT2004_Installer.exe` and run - no other files needed!
 
@@ -78,7 +78,7 @@ Simply download `UT2004_Installer.exe` and run - no other files needed!
 **Option 2 - Build from Source:**
 1. Download source code from GitHub
 2. Install [AutoIt](https://www.autoitscript.com/)
-3. Compile `UT2004_Installer_v0.6.7.au3` yourself
+3. Compile `UT2004_Installer_v0.6.8.au3` yourself
 4. You'll see exactly what the installer does!
 
 **Note:** This is a common issue with AutoIt-compiled programs. The installer performs no malicious actions - it only installs UT2004 and community patches.
@@ -148,6 +148,22 @@ The uninstaller removes:
 8. **Phase ConfigureGame:** Apply resolution and detail settings to UT2004.ini
 9. **Phase Finalise:** Move/clean download cache and temp files
 
+### Configurable Download URLs
+The installer supports custom download URLs via `installer_settings.ini` (created automatically on first run). This allows hosting files on any server — Cloudflare R2, a personal server, etc. — without recompiling.
+
+Example configuration:
+```ini
+[DownloadURLs_ISO]
+URL=https://your-host.example.com/UT2004.ISO
+
+[DownloadURLs_MegaPack]
+Part1=https://your-host.example.com/MegaPack.z01
+Part2=https://your-host.example.com/MegaPack.z02
+Part3=https://your-host.example.com/MegaPack.zip
+```
+
+Any number of parts, any key names. Falls back to default URLs if section is missing.
+
 ### Bundled Tools
 - **7-Zip** v24.08 (LGPL) - ISO and archive extraction
 - **unshield** v1.6.2 (MIT) - InstallShield CAB extraction
@@ -156,6 +172,21 @@ The uninstaller removes:
 All tools are embedded in the installer and extracted to temp directory during installation.
 
 ## 📝 Changelog
+
+### v0.6.8 (2026-02-20)
+**New Features:**
+- Configurable download URLs via `installer_settings.ini` - host files anywhere (Cloudflare R2, custom server, etc.)
+- `installer_settings.ini` created automatically on first run with example configuration
+- Any number of parts per pack supported - key names in INI don't matter
+- Single-file archive detection - if only one URL provided, 7z integrity test run automatically
+- Portable cache updated - now matches cached files by URL-derived filename, not hardcoded names
+- ISO filename derived from URL - no longer assumes file is always called `UT2004.ISO`
+- Falls back to default GitHub URLs if no INI section found
+
+**Improvements:**
+- Generic `DownloadPackFiles()` function replaces repeated download logic across all bonus pack phases
+- Generic `GetDownloadURLs()` function reusable for any future download types
+- Download logic completely separated from extraction/install logic
 
 ### v0.6.7 (2026-02-18)
 **New Features:**
